@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, Play, XCircle, MinusCircle, Crown, History, ChevronDown, ChevronRight, Lock, Calendar, Eye, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, Play, XCircle, MinusCircle, Crown, History, ChevronDown, ChevronRight, Lock, Calendar, Eye, AlertCircle, Settings, Trash2, ShieldAlert, ListFilter, Clock, RotateCcw } from 'lucide-react';
 
 interface AdditionViewProps {
   onBack: () => void;
@@ -12,7 +12,10 @@ enum AdditionSubView {
   QUIZ = 'quiz',
   RESULTS = 'results',
   LOCAL_DASHBOARD = 'local_dashboard',
-  REVIEW = 'review'
+  REVIEW = 'review',
+  ADMIN_LOGIN = 'admin_login',
+  ADMIN_DASHBOARD = 'admin_dashboard',
+  MASTER_HISTORY = 'master_history'
 }
 
 interface Question {
@@ -24,6 +27,7 @@ interface Question {
 interface QuestionResult extends Question {
   userAnswer: number;
   isCorrect: boolean;
+  timeTaken?: number; // In seconds
 }
 
 interface GameSession {
@@ -50,7 +54,16 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const [subView, setSubView] = useState<AdditionSubView>(AdditionSubView.HUB);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminError, setAdminError] = useState('');
+  const [historyFilter, setHistoryFilter] = useState<'Ayaan' | 'Riyaan'>('Ayaan');
   
+  // Date Override State
+  const [dateOverride, setDateOverride] = useState<string | null>(() => localStorage.getItem('addition_date_override'));
+
+  // Ref for tracking question timing
+  const lastQuestionTimeRef = useRef<number>(0);
+
   // Persistent State
   const [ayaanTotal, setAyaanTotal] = useState<number>(() => Number(localStorage.getItem('ayaan_earnings') || '0'));
   const [riyaanTotal, setRiyaanTotal] = useState<number>(() => Number(localStorage.getItem('riyaan_earnings') || '0'));
@@ -58,6 +71,18 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     const saved = localStorage.getItem('addition_history');
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Helper to get effective current date
+  const getEffectiveDate = useCallback(() => {
+    if (dateOverride) {
+      const d = new Date(dateOverride);
+      // Keep current time part for better resolution
+      const now = new Date();
+      d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+      return d;
+    }
+    return new Date();
+  }, [dateOverride]);
 
   // Quiz State
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -74,15 +99,15 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
 
   const hasPlayedToday = useCallback((player: string | null) => {
     if (!player) return false;
-    const today = new Date().toDateString();
+    const today = getEffectiveDate().toDateString();
     return history.some(s => s.player === player && new Date(s.timestamp).toDateString() === today);
-  }, [history]);
+  }, [history, getEffectiveDate]);
 
   const getTodaySession = useCallback((player: string | null) => {
     if (!player) return null;
-    const today = new Date().toDateString();
+    const today = getEffectiveDate().toDateString();
     return history.find(s => s.player === player && new Date(s.timestamp).toDateString() === today);
-  }, [history]);
+  }, [history, getEffectiveDate]);
 
   const generateQuestions = useCallback(() => {
     const newQuestions: Question[] = [];
@@ -108,20 +133,22 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
       localStorage.setItem('riyaan_earnings', newVal.toString());
     }
 
+    const effectiveTime = getEffectiveDate().getTime();
+
     const newSession: GameSession = {
       id: Math.random().toString(36).substr(2, 9),
       player: selectedUser || 'Unknown',
       score,
       wrong: wrongCount,
       earnings,
-      timestamp: Date.now(),
+      timestamp: effectiveTime,
       results: sessionResults
     };
-    const updatedHistory = [newSession, ...history].slice(0, 100);
+    const updatedHistory = [newSession, ...history].slice(0, 500); // Increased slice for history
     setHistory(updatedHistory);
     localStorage.setItem('addition_history', JSON.stringify(updatedHistory));
     setSubView(AdditionSubView.RESULTS);
-  }, [score, wrongCount, selectedUser, ayaanTotal, riyaanTotal, history, sessionResults]);
+  }, [score, wrongCount, selectedUser, ayaanTotal, riyaanTotal, history, sessionResults, getEffectiveDate]);
 
   useEffect(() => {
     finishRef.current = finishQuiz;
@@ -138,6 +165,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     setSessionResults([]);
     setIsActive(true);
     setSubView(AdditionSubView.QUIZ);
+    lastQuestionTimeRef.current = Date.now();
   };
 
   useEffect(() => {
@@ -166,7 +194,10 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const processAnswer = (val: string) => {
     const numericAns = parseInt(val, 10);
     const correct = numericAns === questions[currentIndex].answer;
-    
+    const now = Date.now();
+    const timeTaken = (now - lastQuestionTimeRef.current) / 1000;
+    lastQuestionTimeRef.current = now;
+
     if (correct) setScore((s) => s + 1);
     else setWrongCount((w) => w + 1);
 
@@ -174,7 +205,8 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     setSessionResults(prev => [...prev, {
       ...questions[currentIndex],
       userAnswer: numericAns,
-      isCorrect: correct
+      isCorrect: correct,
+      timeTaken
     }]);
 
     if (currentIndex < 99) {
@@ -224,26 +256,112 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     return Object.values(groups).sort((a, b) => b.timestamp - a.timestamp);
   }, [history]);
 
+  const masterQuestionHistory = useMemo(() => {
+    const allQuestions: Array<QuestionResult & { player: string; timestamp: number }> = [];
+    history.forEach(session => {
+      if (session.results) {
+        session.results.forEach(q => {
+          allQuestions.push({
+            ...q,
+            player: session.player,
+            timestamp: session.timestamp
+          });
+        });
+      }
+    });
+    
+    // Filter by player (Only Ayaan or Riyaan)
+    const filtered = allQuestions.filter(q => q.player === historyFilter);
+
+    // Sort by newest first
+    return filtered.sort((a, b) => b.timestamp - a.timestamp);
+  }, [history, historyFilter]);
+
+  // Admin Functions
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPassword === 'admin') {
+      setAdminError('');
+      setAdminPassword('');
+      setSubView(AdditionSubView.ADMIN_DASHBOARD);
+    } else {
+      setAdminError('Incorrect password');
+    }
+  };
+
+  const deleteSession = (sessionId: string) => {
+    const sessionToDelete = history.find(s => s.id === sessionId);
+    if (!sessionToDelete) return;
+
+    // Adjust totals
+    if (sessionToDelete.player === 'Ayaan') {
+      const newVal = Math.max(0, ayaanTotal - sessionToDelete.earnings);
+      setAyaanTotal(newVal);
+      localStorage.setItem('ayaan_earnings', newVal.toString());
+    } else {
+      const newVal = Math.max(0, riyaanTotal - sessionToDelete.earnings);
+      setRiyaanTotal(newVal);
+      localStorage.setItem('riyaan_earnings', newVal.toString());
+    }
+
+    const updatedHistory = history.filter(s => s.id !== sessionId);
+    setHistory(updatedHistory);
+    localStorage.setItem('addition_history', JSON.stringify(updatedHistory));
+  };
+
+  const resetAllData = () => {
+    if (confirm('Are you absolutely sure? This will delete all scores and history.')) {
+      setAyaanTotal(0);
+      setRiyaanTotal(0);
+      setHistory([]);
+      localStorage.removeItem('ayaan_earnings');
+      localStorage.removeItem('riyaan_earnings');
+      localStorage.removeItem('addition_history');
+      setSubView(AdditionSubView.HUB);
+    }
+  };
+
+  const updateDateOverride = (val: string) => {
+    setDateOverride(val);
+    localStorage.setItem('addition_date_override', val);
+  };
+
+  const clearDateOverride = () => {
+    setDateOverride(null);
+    localStorage.removeItem('addition_date_override');
+  };
+
   if (subView === AdditionSubView.HUB) {
     const ayaanPlayed = hasPlayedToday('Ayaan');
     const riyaanPlayed = hasPlayedToday('Riyaan');
 
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 animate-in fade-in duration-500">
-        <header className="flex items-center gap-4 mb-12">
-          <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
-            <ArrowLeft size={24} />
+        <header className="flex items-center justify-between mb-12">
+          <div className="flex items-center gap-4">
+            <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
+              <ArrowLeft size={24} />
+            </button>
+            <div className="flex flex-col">
+              <h1 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">Addition Hub</h1>
+              {dateOverride && <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider flex items-center gap-1"><Clock size={10} /> Date Override Active</span>}
+            </div>
+          </div>
+          <button 
+            onClick={() => setSubView(AdditionSubView.ADMIN_LOGIN)}
+            className="p-3 text-slate-300 dark:text-slate-700 hover:text-slate-900 dark:hover:text-slate-300 transition-colors"
+          >
+            <Lock size={18} />
           </button>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Addition Hub</h1>
         </header>
-        <section className="flex flex-col gap-4">
+        <section className="flex flex-col gap-4 max-w-md mx-auto">
           <button 
             onClick={() => handleUserSelect('Ayaan')} 
             className="flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl transition-all group hover:border-indigo-400 active:scale-[0.98]"
           >
             <div className="flex items-center gap-6">
               <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl group-hover:scale-110 transition-transform"><User size={32} /></div>
-              <div className="flex flex-col items-start">
+              <div className="flex flex-col items-start text-left">
                 <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase leading-none">AYAAN</span>
                 {ayaanPlayed && <span className="text-[10px] font-bold text-emerald-500 uppercase mt-1 flex items-center gap-1"><Check size={10} /> Completed Today</span>}
               </div>
@@ -255,7 +373,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
           >
             <div className="flex items-center gap-6">
               <div className="p-4 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-2xl group-hover:scale-110 transition-transform"><Users size={32} /></div>
-              <div className="flex flex-col items-start">
+              <div className="flex flex-col items-start text-left">
                 <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase leading-none">RIYAAN</span>
                 {riyaanPlayed && <span className="text-[10px] font-bold text-emerald-500 uppercase mt-1 flex items-center gap-1"><Check size={10} /> Completed Today</span>}
               </div>
@@ -267,7 +385,226 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
               <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">DASHBOARD</span>
             </div>
           </button>
+          <button onClick={() => setSubView(AdditionSubView.MASTER_HISTORY)} className="flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl hover:border-indigo-400 transition-all active:scale-[0.98] group">
+            <div className="flex items-center gap-6">
+              <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl group-hover:scale-110 transition-transform"><History size={32} /></div>
+              <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">HISTORY</span>
+            </div>
+          </button>
         </section>
+      </div>
+    );
+  }
+
+  if (subView === AdditionSubView.MASTER_HISTORY) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 animate-in slide-in-from-right duration-300">
+        <header className="flex flex-col gap-6 mb-8 max-w-lg mx-auto w-full">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setSubView(AdditionSubView.HUB)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
+              <ArrowLeft size={24} />
+            </button>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Question History</h1>
+          </div>
+          
+          <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-2xl w-full">
+            {(['Ayaan', 'Riyaan'] as const).map(filter => (
+              <button
+                key={filter}
+                onClick={() => setHistoryFilter(filter)}
+                className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                  historyFilter === filter 
+                    ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        </header>
+
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden mb-12 max-w-lg mx-auto w-full">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left table-auto">
+              <thead>
+                <tr className="border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ques</th>
+                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Ans</th>
+                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Corr</th>
+                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Time</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                {masterQuestionHistory.length > 0 ? (
+                  masterQuestionHistory.map((res, idx) => (
+                    <tr 
+                      key={idx} 
+                      className={`transition-colors ${res.isCorrect 
+                        ? 'bg-emerald-50/30 dark:bg-emerald-900/10 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' 
+                        : 'bg-rose-50/30 dark:bg-rose-900/10 hover:bg-rose-50 dark:hover:bg-rose-900/20'
+                      }`}
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="text-sm font-black text-slate-900 dark:text-slate-100 tabular-nums">
+                          {res.num1} + {res.num2}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span className={`text-sm font-black tabular-nums ${res.isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                          {res.userAnswer}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
+                          {res.answer}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-[11px] font-bold text-slate-400 tabular-nums uppercase">
+                          {res.timeTaken ? `${res.timeTaken.toFixed(1)}s` : '-'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-24 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-full">
+                          <History size={32} className="text-slate-200 dark:text-slate-600" />
+                        </div>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">No question records found for {historyFilter}</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (subView === AdditionSubView.ADMIN_LOGIN) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 animate-in zoom-in-95 duration-300">
+        <div className="w-20 h-20 bg-slate-900 dark:bg-white rounded-3xl flex items-center justify-center mb-8">
+          <Settings size={40} className="text-white dark:text-slate-900" />
+        </div>
+        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 uppercase tracking-widest">Admin Access</h2>
+        <form onSubmit={handleAdminLogin} className="w-full max-w-xs space-y-4">
+          <input 
+            type="password" 
+            placeholder="PIN Code"
+            autoFocus
+            className="w-full h-16 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-center text-2xl font-black tracking-[0.5em] focus:border-indigo-500 outline-none transition-all shadow-sm"
+            value={adminPassword}
+            onChange={(e) => setAdminPassword(e.target.value)}
+          />
+          {adminError && <p className="text-center text-rose-500 text-xs font-bold uppercase tracking-widest">{adminError}</p>}
+          <button type="submit" className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all">Unlock</button>
+        </form>
+        <button onClick={() => setSubView(AdditionSubView.HUB)} className="mt-8 text-slate-400 font-bold text-sm uppercase tracking-widest">Cancel</button>
+      </div>
+    );
+  }
+
+  if (subView === AdditionSubView.ADMIN_DASHBOARD) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 animate-in slide-in-from-right duration-300">
+        <header className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setSubView(AdditionSubView.HUB)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
+              <ArrowLeft size={24} />
+            </button>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">System Admin</h1>
+          </div>
+        </header>
+
+        <div className="space-y-6 pb-24 max-w-md mx-auto">
+          {/* App Date Settings */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+              <Calendar size={20} className="text-indigo-500" />
+              <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">System Date</h2>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Override Date</label>
+                <input 
+                  type="date" 
+                  className="w-full h-14 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 px-4 font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none transition-all"
+                  value={dateOverride || ''}
+                  onChange={(e) => updateDateOverride(e.target.value)}
+                />
+              </div>
+              
+              {dateOverride && (
+                <button 
+                  onClick={clearDateOverride}
+                  className="w-full h-14 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 active:bg-indigo-100 transition-colors"
+                >
+                  <RotateCcw size={18} /> Reset to Real-time
+                </button>
+              )}
+              
+              {!dateOverride && (
+                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-800/30">
+                  <p className="text-emerald-700 dark:text-emerald-400 text-xs font-bold leading-relaxed">
+                    Currently using actual real-time: <span className="tabular-nums">{new Date().toDateString()}</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+              <ShieldAlert size={20} className="text-rose-500" />
+              <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Master Controls</h2>
+            </div>
+            <button 
+              onClick={resetAllData}
+              className="w-full h-14 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-800/50 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 active:bg-rose-100 transition-colors"
+            >
+              <Trash2 size={18} /> Reset All App Data
+            </button>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+            <div className="p-6 border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+              <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                <History size={18} className="text-indigo-500" /> Manage Sessions
+              </h2>
+            </div>
+            <div className="divide-y divide-slate-50 dark:divide-slate-800">
+              {history.length > 0 ? history.map((session) => (
+                <div key={session.id} className="p-4 flex items-center justify-between group">
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-slate-900 dark:text-white uppercase">{session.player}</span>
+                      <span className="text-[10px] font-bold text-slate-400 tabular-nums">{new Date(session.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <span className="text-sm font-black text-emerald-500 tabular-nums">₹{session.earnings} <span className="text-[10px] text-slate-400 font-medium tracking-normal ml-1">({session.score} correct)</span></span>
+                  </div>
+                  <button 
+                    onClick={() => deleteSession(session.id)}
+                    className="p-3 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-all"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              )) : (
+                <div className="p-12 text-center">
+                  <p className="text-slate-400 text-xs italic">No history to manage.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -277,7 +614,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     const todaySession = getTodaySession(selectedUser);
 
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 animate-in zoom-in-95 duration-300">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 animate-in zoom-in-95 duration-300 text-center">
         <div className="w-24 h-24 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl flex items-center justify-center mb-8 border border-slate-100 dark:border-slate-800">
           {selectedUser === 'Ayaan' ? <User size={48} className="text-indigo-600" /> : <Users size={48} className="text-rose-600" />}
         </div>
@@ -322,7 +659,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     const currentQ = questions[currentIndex];
     return (
       <div className="min-h-screen bg-white dark:bg-slate-950 flex flex-col p-6 animate-in slide-in-from-right duration-300">
-        <header className="grid grid-cols-3 items-center mb-8">
+        <header className="grid grid-cols-3 items-center mb-8 max-w-lg mx-auto w-full">
           <div className="flex justify-start">
             <div className="flex items-center gap-3 px-4 py-2 bg-slate-100 dark:bg-slate-900 rounded-2xl"><span className="font-black text-slate-900 dark:text-white text-xl tabular-nums min-w-[3ch] text-center">{timeLeft}s</span></div>
           </div>
@@ -333,7 +670,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
           <div className="flex items-center gap-8 text-7xl font-black text-slate-900 dark:text-white mb-4"><span>{currentQ?.num1}</span><span className="text-indigo-500">+</span><span>{currentQ?.num2}</span></div>
           <div className="w-full max-w-xs h-24 bg-slate-50 dark:bg-slate-900/50 rounded-3xl flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800"><span className="text-6xl font-black text-slate-900 dark:text-white tracking-widest tabular-nums">{userInput || '___'}</span></div>
         </div>
-        <div className="mt-8 grid grid-cols-3 gap-3 mb-6">
+        <div className="mt-8 grid grid-cols-3 gap-3 mb-6 max-w-xs mx-auto w-full">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map((num) => (
             <button key={num} onClick={() => handleKeyClick(num.toString())} className={`${num === 0 ? 'col-start-2' : ''} h-16 bg-slate-50 dark:bg-slate-900 text-2xl font-black text-slate-900 dark:text-white rounded-2xl active:bg-slate-200 shadow-sm transition-transform active:scale-95`}>{num}</button>
           ))}
@@ -350,13 +687,13 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
         <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 transition-colors duration-500 ${sessionEarnings >= 0 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' : 'bg-rose-100 dark:bg-rose-900/30 text-rose-600'}`}><IndianRupee size={64} /></div>
         <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Session Earnings</h2>
         <div className={`text-6xl font-black mb-12 tabular-nums transition-colors duration-500 ${sessionEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>₹{sessionEarnings}</div>
-        <div className="grid grid-cols-3 gap-4 mb-6 w-full max-w-sm">
-          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800"><Check size={20} className="mx-auto mb-1 text-emerald-500" /><p className="text-2xl font-black text-slate-900 dark:text-white">+{score}</p></div>
-          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800"><XCircle size={20} className="mx-auto mb-1 text-rose-500" /><p className="text-2xl font-black text-rose-500">-{wrongCount}</p></div>
-          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800"><MinusCircle size={20} className="mx-auto mb-1 text-slate-400" /><p className="text-2xl font-black text-slate-400">{skippedCount}</p></div>
+        <div className="grid grid-cols-3 gap-4 mb-6 w-full max-sm:px-4 max-w-sm mx-auto">
+          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-center"><Check size={20} className="mx-auto mb-1 text-emerald-500" /><p className="text-2xl font-black text-slate-900 dark:text-white">+{score}</p></div>
+          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-center"><XCircle size={20} className="mx-auto mb-1 text-rose-500" /><p className="text-2xl font-black text-rose-500">-{wrongCount}</p></div>
+          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-center"><MinusCircle size={20} className="mx-auto mb-1 text-slate-400" /><p className="text-2xl font-black text-slate-400">{skippedCount}</p></div>
         </div>
-        <button onClick={() => setSubView(AdditionSubView.REVIEW)} className="w-full max-w-sm mb-3 h-16 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl font-black text-lg text-slate-900 dark:text-white shadow-md active:scale-95 transition-all">VIEW ANSWERS</button>
-        <button onClick={() => setSubView(AdditionSubView.HUB)} className="w-full max-w-sm h-16 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-lg tracking-widest uppercase shadow-xl active:scale-95 transition-all">EXIT</button>
+        <button onClick={() => setSubView(AdditionSubView.REVIEW)} className="w-full max-sm:px-4 max-w-sm mb-3 h-16 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl font-black text-lg text-slate-900 dark:text-white shadow-md active:scale-95 transition-all mx-auto block">VIEW ANSWERS</button>
+        <button onClick={() => setSubView(AdditionSubView.HUB)} className="w-full max-w-sm h-16 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-lg tracking-widest uppercase shadow-xl active:scale-95 transition-all mx-auto block">EXIT</button>
       </div>
     );
   }
@@ -365,40 +702,72 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 animate-in slide-in-from-bottom duration-300">
         <header className="flex items-center gap-4 mb-8">
-          <button onClick={() => setSubView(AdditionSubView.PRE_ENTRY)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
+          <button onClick={() => setSubView(AdditionSubView.RESULTS)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
             <ArrowLeft size={24} />
           </button>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">Session Review</h1>
         </header>
         
-        <div className="space-y-3 mb-12">
-          {sessionResults.length === 0 ? (
-            <div className="text-center py-20 flex flex-col items-center gap-4">
-              <AlertCircle size={48} className="text-slate-200" />
-              <p className="text-slate-400 font-medium">No questions attempted in this session.</p>
-            </div>
-          ) : (
-            sessionResults.map((res, idx) => (
-              <div key={idx} className={`flex items-center justify-between p-4 bg-white dark:bg-slate-900 rounded-2xl border ${res.isCorrect ? 'border-emerald-100 dark:border-emerald-900/30' : 'border-rose-100 dark:border-rose-900/30'} shadow-sm`}>
-                <div className="flex items-center gap-4">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${res.isCorrect ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-500' : 'bg-rose-50 dark:bg-rose-900/30 text-rose-500'}`}>
-                    {idx + 1}
-                  </div>
-                  <div>
-                    <div className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
-                      {res.num1} + {res.num2} = <span className={res.isCorrect ? 'text-emerald-500' : 'text-rose-500'}>{res.userAnswer}</span>
-                    </div>
-                    {!res.isCorrect && (
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        Correct: <span className="text-emerald-500">{res.answer}</span>
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden mb-12 max-w-2xl mx-auto w-full">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left table-fixed min-w-[320px]">
+              <colgroup>
+                <col className="w-12" />
+                <col className="w-1/3" />
+                <col className="w-1/4" />
+                <col className="w-1/4" />
+              </colgroup>
+              <thead>
+                <tr className="border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">#</th>
+                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Question</th>
+                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Your Ans</th>
+                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Correct Ans</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {sessionResults.length > 0 ? (
+                  sessionResults.map((res, idx) => (
+                    <tr 
+                      key={idx} 
+                      className={`transition-colors ${res.isCorrect 
+                        ? 'bg-emerald-50/50 dark:bg-emerald-900/10 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' 
+                        : 'bg-rose-50/50 dark:bg-rose-900/10 hover:bg-rose-50 dark:hover:bg-rose-900/20'
+                      }`}
+                    >
+                      <td className="px-4 py-5 text-[11px] font-bold text-slate-400 tabular-nums">
+                        {idx + 1}
+                      </td>
+                      <td className="px-4 py-5">
+                        <span className="text-sm font-black text-slate-900 dark:text-slate-100 tabular-nums">
+                          {res.num1} + {res.num2}
+                        </span>
+                      </td>
+                      <td className="px-4 py-5">
+                        <span className={`text-sm font-black tabular-nums ${res.isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                          {res.userAnswer}
+                        </span>
+                      </td>
+                      <td className="px-4 py-5">
+                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
+                          {res.answer}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-20 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <AlertCircle size={32} className="text-slate-200 dark:text-slate-800" />
+                        <p className="text-slate-400 text-xs font-medium italic">No entries in this session.</p>
                       </div>
-                    )}
-                  </div>
-                </div>
-                {res.isCorrect ? <Check size={20} className="text-emerald-500" /> : <XCircle size={20} className="text-rose-500" />}
-              </div>
-            ))
-          )}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     );
@@ -411,111 +780,113 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
 
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 animate-in slide-in-from-right duration-300 overflow-x-hidden">
-        <header className="flex items-center gap-4 mb-8">
-          <button onClick={() => setSubView(AdditionSubView.HUB)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white"><ArrowLeft size={24} /></button>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Player Earnings</h1>
-        </header>
-        
-        <div className="flex flex-col items-center w-full px-2">
-          {/* Top Section with Circles - Centered Podium Arrangement */}
-          <div className="relative flex items-center justify-center w-full h-64 sm:h-80 mb-6">
-            <div className="flex items-center justify-center gap-0">
-              {/* Leader Circle */}
-              <div className={`relative z-20 w-44 h-44 sm:w-56 sm:h-56 md:w-64 md:h-64 rounded-full bg-white dark:bg-slate-900 border-[6px] border-${leader.color}-500 flex flex-col items-center justify-center shadow-2xl animate-in zoom-in duration-700 overflow-hidden`}>
-                <div className="absolute top-3 sm:top-4 bg-amber-400 text-white p-1.5 sm:p-2 rounded-full shadow-lg ring-4 ring-white dark:ring-slate-950"><Crown size={20} fill="currentColor" /></div>
-                <leader.icon size={32} className={`text-${leader.color}-500 mb-1 mt-4 sm:mt-6`} />
-                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{leader.name}</h3>
-                <div className="flex items-center justify-center gap-0.5 w-full px-3">
-                  <IndianRupee size={16} className="text-slate-400 flex-shrink-0" />
-                  <span className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white tabular-nums tracking-tighter">
-                    {leader.total.toLocaleString()}
-                  </span>
+        <div className="max-w-2xl mx-auto w-full">
+          <header className="flex items-center gap-4 mb-8">
+            <button onClick={() => setSubView(AdditionSubView.HUB)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white"><ArrowLeft size={24} /></button>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Player Earnings</h1>
+          </header>
+          
+          <div className="flex flex-col items-center w-full">
+            {/* Top Section with Circles - Centered Podium Arrangement */}
+            <div className="relative flex items-center justify-center w-full h-64 sm:h-80 mb-6">
+              <div className="flex items-center justify-center">
+                {/* Leader Circle */}
+                <div className={`relative z-20 w-44 h-44 sm:w-56 sm:h-56 md:w-64 md:h-64 rounded-full bg-white dark:bg-slate-900 border-[6px] border-${leader.color}-500 flex flex-col items-center justify-center shadow-2xl animate-in zoom-in duration-700 overflow-hidden`}>
+                  <div className="absolute top-3 sm:top-4 bg-amber-400 text-white p-1.5 sm:p-2 rounded-full shadow-lg ring-4 ring-white dark:ring-slate-950"><Crown size={20} fill="currentColor" /></div>
+                  <leader.icon size={32} className={`text-${leader.color}-500 mb-1 mt-4 sm:mt-6`} />
+                  <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{leader.name}</h3>
+                  <div className="flex items-center justify-center gap-0.5 w-full px-3">
+                    <IndianRupee size={16} className="text-slate-400 flex-shrink-0" />
+                    <span className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white tabular-nums tracking-tighter">
+                      {leader.total.toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              {/* Runner Circle - Adjusted to handle 6+ digits better */}
-              <div className={`relative z-10 -ml-10 sm:-ml-12 w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full bg-white dark:bg-slate-900 border-2 border-${runner.color}-300 flex flex-col items-center justify-center shadow-xl animate-in zoom-in duration-1000 delay-300 overflow-hidden`}>
-                <runner.icon size={20} className={`text-${runner.color}-400 mb-1`} />
-                <h3 className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-0.5">{runner.name}</h3>
-                <div className="flex items-center justify-center gap-0.5 w-full px-3">
-                  <IndianRupee size={10} className="text-slate-400 flex-shrink-0" />
-                  <span className="text-base sm:text-lg md:text-xl font-black text-slate-900 dark:text-white tabular-nums tracking-tighter">
-                    {runner.total.toLocaleString()}
-                  </span>
+                {/* Runner Circle - Adjusted to handle 6+ digits better */}
+                <div className={`relative z-10 -ml-10 sm:-ml-12 w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full bg-white dark:bg-slate-900 border-2 border-${runner.color}-300 flex flex-col items-center justify-center shadow-xl animate-in zoom-in duration-1000 delay-300 overflow-hidden`}>
+                  <runner.icon size={20} className={`text-${runner.color}-400 mb-1`} />
+                  <h3 className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-0.5">{runner.name}</h3>
+                  <div className="flex items-center justify-center gap-0.5 w-full px-3">
+                    <IndianRupee size={10} className="text-slate-400 flex-shrink-0" />
+                    <span className="text-base sm:text-lg md:text-xl font-black text-slate-900 dark:text-white tabular-nums tracking-tighter">
+                      {runner.total.toLocaleString()}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          
-          {/* History Section - Collapsible Trigger with Individual Times */}
-          <div className="w-full mt-4 mb-24">
-            <button 
-              onClick={() => setIsHistoryCollapsed(!isHistoryCollapsed)}
-              className="w-full h-14 flex items-center justify-between gap-2 mb-4 px-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-all active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-3">
-                <History size={18} className="text-indigo-500" />
-                <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.2em]">History</h2>
-              </div>
-              <div className="w-6 h-6 flex items-center justify-center">
-                {isHistoryCollapsed ? <ChevronRight size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
-              </div>
-            </button>
             
-            {!isHistoryCollapsed && (
-              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden animate-in slide-in-from-top-2 duration-300">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left min-w-[300px]">
-                    <thead>
-                      <tr className="border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-                        <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
-                        <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Ayaan</th>
-                        <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Riyaan</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                      {groupedHistory.length > 0 ? (
-                        groupedHistory.map((record) => (
-                          <tr key={record.dateKey} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                            <td className="px-5 py-5">
-                              <span className="text-[11px] text-slate-900 dark:text-slate-200 font-bold tabular-nums">{record.displayDate}</span>
-                            </td>
-                            <td className="px-5 py-5 text-center">
-                              {record.ayaanEarnings !== null ? (
-                                <div className="flex flex-col items-center">
-                                  <span className={`text-sm font-black tabular-nums ${record.ayaanEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                    {record.ayaanEarnings >= 0 ? '+' : ''}{record.ayaanEarnings.toLocaleString()}
-                                  </span>
-                                  <span className="text-[9px] text-slate-400 font-medium tabular-nums">{record.ayaanTime}</span>
-                                </div>
-                              ) : <span className="text-slate-200 dark:text-slate-800">—</span>}
-                            </td>
-                            <td className="px-5 py-5 text-center">
-                              {record.riyaanEarnings !== null ? (
-                                <div className="flex flex-col items-center">
-                                  <span className={`text-sm font-black tabular-nums ${record.riyaanEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                    {record.riyaanEarnings >= 0 ? '+' : ''}{record.riyaanEarnings.toLocaleString()}
-                                  </span>
-                                  <span className="text-[9px] text-slate-400 font-medium tabular-nums">{record.riyaanTime}</span>
-                                </div>
-                              ) : <span className="text-slate-200 dark:text-slate-800">—</span>}
+            {/* History Section - Collapsible Trigger with Individual Times */}
+            <div className="w-full mt-4 mb-24 px-1">
+              <button 
+                onClick={() => setIsHistoryCollapsed(!isHistoryCollapsed)}
+                className="w-full h-14 flex items-center justify-between gap-2 mb-4 px-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-all active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-3">
+                  <History size={18} className="text-indigo-500" />
+                  <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.2em]">Daily Summary</h2>
+                </div>
+                <div className="w-6 h-6 flex items-center justify-center">
+                  {isHistoryCollapsed ? <ChevronRight size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+                </div>
+              </button>
+              
+              {!isHistoryCollapsed && (
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden animate-in slide-in-from-top-2 duration-300 w-full">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left table-auto">
+                      <thead>
+                        <tr className="border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+                          <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                          <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Ayaan</th>
+                          <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Riyaan</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                        {groupedHistory.length > 0 ? (
+                          groupedHistory.map((record) => (
+                            <tr key={record.dateKey} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                              <td className="px-5 py-5 whitespace-nowrap">
+                                <span className="text-[11px] text-slate-900 dark:text-slate-200 font-bold tabular-nums">{record.displayDate}</span>
+                              </td>
+                              <td className="px-5 py-5 text-center">
+                                {record.ayaanEarnings !== null ? (
+                                  <div className="flex flex-col items-center">
+                                    <span className={`text-sm font-black tabular-nums ${record.ayaanEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                      {record.ayaanEarnings >= 0 ? '+' : ''}{record.ayaanEarnings.toLocaleString()}
+                                    </span>
+                                    <span className="text-[9px] text-slate-400 font-medium tabular-nums whitespace-nowrap">{record.ayaanTime}</span>
+                                  </div>
+                                ) : <span className="text-slate-200 dark:text-slate-800">—</span>}
+                              </td>
+                              <td className="px-5 py-5 text-center">
+                                {record.riyaanEarnings !== null ? (
+                                  <div className="flex flex-col items-center">
+                                    <span className={`text-sm font-black tabular-nums ${record.riyaanEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                      {record.riyaanEarnings >= 0 ? '+' : ''}{record.riyaanEarnings.toLocaleString()}
+                                    </span>
+                                    <span className="text-[9px] text-slate-400 font-medium tabular-nums whitespace-nowrap">{record.riyaanTime}</span>
+                                  </div>
+                                ) : <span className="text-slate-200 dark:text-slate-800">—</span>}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={3} className="px-5 py-16 text-center">
+                              <div className="flex flex-col items-center gap-2">
+                                <History size={32} className="text-slate-200 dark:text-slate-800" />
+                                <p className="text-slate-400 text-xs font-medium italic">No entries in history.</p>
+                              </div>
                             </td>
                           </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={3} className="px-5 py-16 text-center">
-                            <div className="flex flex-col items-center gap-2">
-                              <History size={32} className="text-slate-200 dark:text-slate-800" />
-                              <p className="text-slate-400 text-xs font-medium italic">No entries in history.</p>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
