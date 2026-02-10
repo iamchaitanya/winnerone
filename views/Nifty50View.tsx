@@ -484,8 +484,8 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
               <thead>
                 <tr className="border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
                   <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.2em] text-center border-x border-slate-50 dark:border-slate-800">Ayaan's Pick</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-rose-500 dark:text-rose-400 uppercase tracking-[0.2em] text-center">Riyaan's Pick</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.2em] text-center border-x border-slate-50 dark:border-slate-800">Ayaan</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-rose-500 dark:text-rose-400 uppercase tracking-[0.2em] text-center">Riyaan</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
