@@ -4,6 +4,7 @@ import { HomeView } from './views/HomeView';
 import { AdditionView } from './views/AdditionView';
 import { Nifty50View } from './views/Nifty50View';
 import { DashboardView } from './views/DashboardView';
+import { AdminView } from './views/AdminView';
 import { ViewType } from './types';
 
 const App: React.FC = () => {
@@ -38,6 +39,8 @@ const App: React.FC = () => {
         return <Nifty50View onBack={() => setCurrentView(ViewType.HOME)} />;
       case ViewType.DASHBOARD:
         return <DashboardView onBack={() => setCurrentView(ViewType.HOME)} />;
+      case ViewType.ADMIN:
+        return <AdminView onBack={() => setCurrentView(ViewType.HOME)} />;
       default:
         return <HomeView onNavigate={setCurrentView} isDarkMode={isDarkMode} onToggleDark={toggleDarkMode} />;
     }

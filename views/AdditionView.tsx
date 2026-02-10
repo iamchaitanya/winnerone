@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, Play, XCircle, MinusCircle, Crown, History, ChevronDown, ChevronRight, Lock, Calendar, Eye, AlertCircle, Settings, Trash2, ShieldAlert, ListFilter, Clock, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, Play, XCircle, MinusCircle, Crown, History, ChevronDown, ChevronRight, Calendar, Eye, AlertCircle, Clock } from 'lucide-react';
 
 interface AdditionViewProps {
   onBack: () => void;
@@ -13,8 +13,6 @@ enum AdditionSubView {
   RESULTS = 'results',
   LOCAL_DASHBOARD = 'local_dashboard',
   REVIEW = 'review',
-  ADMIN_LOGIN = 'admin_login',
-  ADMIN_DASHBOARD = 'admin_dashboard',
   MASTER_HISTORY = 'master_history'
 }
 
@@ -54,12 +52,10 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const [subView, setSubView] = useState<AdditionSubView>(AdditionSubView.HUB);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
-  const [adminPassword, setAdminPassword] = useState('');
-  const [adminError, setAdminError] = useState('');
   const [historyFilter, setHistoryFilter] = useState<'Ayaan' | 'Riyaan'>('Ayaan');
   
-  // Date Override State
-  const [dateOverride, setDateOverride] = useState<string | null>(() => localStorage.getItem('addition_date_override'));
+  // Date Override (Read-only here, managed in AdminView)
+  const [dateOverride] = useState<string | null>(() => localStorage.getItem('addition_date_override'));
 
   // Ref for tracking question timing
   const lastQuestionTimeRef = useRef<number>(0);
@@ -76,7 +72,6 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const getEffectiveDate = useCallback(() => {
     if (dateOverride) {
       const d = new Date(dateOverride);
-      // Keep current time part for better resolution
       const now = new Date();
       d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
       return d;
@@ -144,7 +139,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
       timestamp: effectiveTime,
       results: sessionResults
     };
-    const updatedHistory = [newSession, ...history].slice(0, 500); // Increased slice for history
+    const updatedHistory = [newSession, ...history].slice(0, 500);
     setHistory(updatedHistory);
     localStorage.setItem('addition_history', JSON.stringify(updatedHistory));
     setSubView(AdditionSubView.RESULTS);
@@ -201,7 +196,6 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     if (correct) setScore((s) => s + 1);
     else setWrongCount((w) => w + 1);
 
-    // Record result
     setSessionResults(prev => [...prev, {
       ...questions[currentIndex],
       userAnswer: numericAns,
@@ -269,67 +263,9 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
         });
       }
     });
-    
-    // Filter by player (Only Ayaan or Riyaan)
     const filtered = allQuestions.filter(q => q.player === historyFilter);
-
-    // Sort by newest first
     return filtered.sort((a, b) => b.timestamp - a.timestamp);
   }, [history, historyFilter]);
-
-  // Admin Functions
-  const handleAdminLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (adminPassword === 'admin') {
-      setAdminError('');
-      setAdminPassword('');
-      setSubView(AdditionSubView.ADMIN_DASHBOARD);
-    } else {
-      setAdminError('Incorrect password');
-    }
-  };
-
-  const deleteSession = (sessionId: string) => {
-    const sessionToDelete = history.find(s => s.id === sessionId);
-    if (!sessionToDelete) return;
-
-    // Adjust totals
-    if (sessionToDelete.player === 'Ayaan') {
-      const newVal = Math.max(0, ayaanTotal - sessionToDelete.earnings);
-      setAyaanTotal(newVal);
-      localStorage.setItem('ayaan_earnings', newVal.toString());
-    } else {
-      const newVal = Math.max(0, riyaanTotal - sessionToDelete.earnings);
-      setRiyaanTotal(newVal);
-      localStorage.setItem('riyaan_earnings', newVal.toString());
-    }
-
-    const updatedHistory = history.filter(s => s.id !== sessionId);
-    setHistory(updatedHistory);
-    localStorage.setItem('addition_history', JSON.stringify(updatedHistory));
-  };
-
-  const resetAllData = () => {
-    if (confirm('Are you absolutely sure? This will delete all scores and history.')) {
-      setAyaanTotal(0);
-      setRiyaanTotal(0);
-      setHistory([]);
-      localStorage.removeItem('ayaan_earnings');
-      localStorage.removeItem('riyaan_earnings');
-      localStorage.removeItem('addition_history');
-      setSubView(AdditionSubView.HUB);
-    }
-  };
-
-  const updateDateOverride = (val: string) => {
-    setDateOverride(val);
-    localStorage.setItem('addition_date_override', val);
-  };
-
-  const clearDateOverride = () => {
-    setDateOverride(null);
-    localStorage.removeItem('addition_date_override');
-  };
 
   if (subView === AdditionSubView.HUB) {
     const ayaanPlayed = hasPlayedToday('Ayaan');
@@ -344,15 +280,9 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
             </button>
             <div className="flex flex-col">
               <h1 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">Addition Hub</h1>
-              {dateOverride && <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider flex items-center gap-1"><Clock size={10} /> Date Override Active</span>}
+              {dateOverride && <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider flex items-center gap-1"><Clock size={10} /> Override Active</span>}
             </div>
           </div>
-          <button 
-            onClick={() => setSubView(AdditionSubView.ADMIN_LOGIN)}
-            className="p-3 text-slate-300 dark:text-slate-700 hover:text-slate-900 dark:hover:text-slate-300 transition-colors"
-          >
-            <Lock size={18} />
-          </button>
         </header>
         <section className="flex flex-col gap-4 max-w-md mx-auto">
           <button 
@@ -474,135 +404,13 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
                         <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-full">
                           <History size={32} className="text-slate-200 dark:text-slate-600" />
                         </div>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">No question records found for {historyFilter}</p>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">No records found</p>
                       </div>
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (subView === AdditionSubView.ADMIN_LOGIN) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 animate-in zoom-in-95 duration-300">
-        <div className="w-20 h-20 bg-slate-900 dark:bg-white rounded-3xl flex items-center justify-center mb-8">
-          <Settings size={40} className="text-white dark:text-slate-900" />
-        </div>
-        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 uppercase tracking-widest">Admin Access</h2>
-        <form onSubmit={handleAdminLogin} className="w-full max-w-xs space-y-4">
-          <input 
-            type="password" 
-            placeholder="PIN Code"
-            autoFocus
-            className="w-full h-16 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-center text-2xl font-black tracking-[0.5em] focus:border-indigo-500 outline-none transition-all shadow-sm"
-            value={adminPassword}
-            onChange={(e) => setAdminPassword(e.target.value)}
-          />
-          {adminError && <p className="text-center text-rose-500 text-xs font-bold uppercase tracking-widest">{adminError}</p>}
-          <button type="submit" className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all">Unlock</button>
-        </form>
-        <button onClick={() => setSubView(AdditionSubView.HUB)} className="mt-8 text-slate-400 font-bold text-sm uppercase tracking-widest">Cancel</button>
-      </div>
-    );
-  }
-
-  if (subView === AdditionSubView.ADMIN_DASHBOARD) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 animate-in slide-in-from-right duration-300">
-        <header className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setSubView(AdditionSubView.HUB)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
-              <ArrowLeft size={24} />
-            </button>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">System Admin</h1>
-          </div>
-        </header>
-
-        <div className="space-y-6 pb-24 max-w-md mx-auto">
-          {/* App Date Settings */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
-            <div className="flex items-center gap-3 mb-6">
-              <Calendar size={20} className="text-indigo-500" />
-              <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">System Date</h2>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Override Date</label>
-                <input 
-                  type="date" 
-                  className="w-full h-14 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 px-4 font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none transition-all"
-                  value={dateOverride || ''}
-                  onChange={(e) => updateDateOverride(e.target.value)}
-                />
-              </div>
-              
-              {dateOverride && (
-                <button 
-                  onClick={clearDateOverride}
-                  className="w-full h-14 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 active:bg-indigo-100 transition-colors"
-                >
-                  <RotateCcw size={18} /> Reset to Real-time
-                </button>
-              )}
-              
-              {!dateOverride && (
-                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-800/30">
-                  <p className="text-emerald-700 dark:text-emerald-400 text-xs font-bold leading-relaxed">
-                    Currently using actual real-time: <span className="tabular-nums">{new Date().toDateString()}</span>
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
-            <div className="flex items-center gap-3 mb-6">
-              <ShieldAlert size={20} className="text-rose-500" />
-              <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Master Controls</h2>
-            </div>
-            <button 
-              onClick={resetAllData}
-              className="w-full h-14 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-800/50 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 active:bg-rose-100 transition-colors"
-            >
-              <Trash2 size={18} /> Reset All App Data
-            </button>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
-            <div className="p-6 border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-              <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
-                <History size={18} className="text-indigo-500" /> Manage Sessions
-              </h2>
-            </div>
-            <div className="divide-y divide-slate-50 dark:divide-slate-800">
-              {history.length > 0 ? history.map((session) => (
-                <div key={session.id} className="p-4 flex items-center justify-between group">
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-black text-slate-900 dark:text-white uppercase">{session.player}</span>
-                      <span className="text-[10px] font-bold text-slate-400 tabular-nums">{new Date(session.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                    <span className="text-sm font-black text-emerald-500 tabular-nums">₹{session.earnings} <span className="text-[10px] text-slate-400 font-medium tracking-normal ml-1">({session.score} correct)</span></span>
-                  </div>
-                  <button 
-                    onClick={() => deleteSession(session.id)}
-                    className="p-3 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-all"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              )) : (
-                <div className="p-12 text-center">
-                  <p className="text-slate-400 text-xs italic">No history to manage.</p>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -633,7 +441,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
                   setSubView(AdditionSubView.REVIEW);
                 }
               }}
-              className="w-full max-w-xs h-20 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 transition-all hover:scale-105 active:scale-95 shadow-xl"
+              className="w-full max-w-xs h-20 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 transition-all hover:scale-105 active:scale-95 shadow-xl mx-auto block"
             >
               <Eye size={24} /> REVIEW RESULTS
             </button>
@@ -643,7 +451,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
             <p className="text-slate-400 font-medium mb-12 uppercase tracking-widest text-xs">Ready for the 100-Question Challenge?</p>
             <button 
               onClick={startQuiz} 
-              className="w-full max-w-xs h-20 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 transition-all hover:scale-105 active:scale-95 shadow-xl"
+              className="w-full max-w-xs h-20 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 transition-all hover:scale-105 active:scale-95 shadow-xl mx-auto block"
             >
               <Play size={24} fill="currentColor" /> START
             </button>
@@ -787,10 +595,8 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
           </header>
           
           <div className="flex flex-col items-center w-full">
-            {/* Top Section with Circles - Centered Podium Arrangement */}
             <div className="relative flex items-center justify-center w-full h-64 sm:h-80 mb-6">
               <div className="flex items-center justify-center">
-                {/* Leader Circle */}
                 <div className={`relative z-20 w-44 h-44 sm:w-56 sm:h-56 md:w-64 md:h-64 rounded-full bg-white dark:bg-slate-900 border-[6px] border-${leader.color}-500 flex flex-col items-center justify-center shadow-2xl animate-in zoom-in duration-700 overflow-hidden`}>
                   <div className="absolute top-3 sm:top-4 bg-amber-400 text-white p-1.5 sm:p-2 rounded-full shadow-lg ring-4 ring-white dark:ring-slate-950"><Crown size={20} fill="currentColor" /></div>
                   <leader.icon size={32} className={`text-${leader.color}-500 mb-1 mt-4 sm:mt-6`} />
@@ -802,7 +608,6 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
                     </span>
                   </div>
                 </div>
-                {/* Runner Circle - Adjusted to handle 6+ digits better */}
                 <div className={`relative z-10 -ml-10 sm:-ml-12 w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full bg-white dark:bg-slate-900 border-2 border-${runner.color}-300 flex flex-col items-center justify-center shadow-xl animate-in zoom-in duration-1000 delay-300 overflow-hidden`}>
                   <runner.icon size={20} className={`text-${runner.color}-400 mb-1`} />
                   <h3 className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-0.5">{runner.name}</h3>
@@ -816,7 +621,6 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
               </div>
             </div>
             
-            {/* History Section - Collapsible Trigger with Individual Times */}
             <div className="w-full mt-4 mb-24 px-1">
               <button 
                 onClick={() => setIsHistoryCollapsed(!isHistoryCollapsed)}
