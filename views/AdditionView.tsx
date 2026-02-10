@@ -85,7 +85,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const [userInput, setUserInput] = useState('');
   const [score, setScore] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(10); 
+  const [timeLeft, setTimeLeft] = useState(100); 
   const [isActive, setIsActive] = useState(false);
   const [sessionResults, setSessionResults] = useState<QuestionResult[]>([]);
 
@@ -156,7 +156,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     setUserInput('');
     setScore(0);
     setWrongCount(0);
-    setTimeLeft(10);
+    setTimeLeft(100);
     setSessionResults([]);
     setIsActive(true);
     setSubView(AdditionSubView.QUIZ);
