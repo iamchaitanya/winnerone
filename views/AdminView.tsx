@@ -83,6 +83,9 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
   // ---------------------------------------------------------
   // 🧨 THE MASTER RESET FUNCTION (Updated for Cloud)
   // ---------------------------------------------------------
+// ---------------------------------------------------------
+  // 🧨 THE MASTER RESET FUNCTION (Fixed to clear Refresh Locks)
+  // ---------------------------------------------------------
   const handleMasterReset = async () => {
     const confirmed = window.confirm("⚠️ DANGER ZONE ⚠️\n\nThis will permanently DELETE ALL DATA from:\n1. The Cloud Database (Supabase)\n2. This Device\n\nAre you absolutely sure?");
     
@@ -95,7 +98,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
         
         if (logError) throw logError;
 
-        // 2. Delete Local Storage
+        // 2. Delete Known Local Storage Keys
         const keysToClear = [
           'ayaan_earnings',
           'riyaan_earnings',
@@ -115,9 +118,13 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
         
         keysToClear.forEach(key => localStorage.removeItem(key));
         
-        // Clear attempts (extra safety)
-        localStorage.removeItem('pin_attempts_ayaan');
-        localStorage.removeItem('pin_attempts_riyaan');
+        // 3. NEW: Hunt down and delete all "Attempt Locks" (The Refresh Bug Fix)
+        // We loop through all keys in storage and find any that start with "addition_attempt_"
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('addition_attempt_')) {
+            localStorage.removeItem(key);
+          }
+        });
         
         alert("✅ System Fully Wiped. App will now restart.");
         window.location.reload();
