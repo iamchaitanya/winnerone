@@ -188,11 +188,20 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
 
   const finishRef = useRef<(fS?: number, fW?: number, fR?: QuestionResult[]) => void>(() => {});
 
-  const hasPlayedToday = useCallback((player: string | null) => {
-    if (!player) return false;
-    const today = getEffectiveDate().toDateString();
-    return history.some(s => s.player === player && new Date(s.timestamp).toDateString() === today);
-  }, [history, getEffectiveDate]);
+// 🔒 UPDATED: Checks both Cloud History AND Local "Attempt" Flags
+const hasPlayedToday = useCallback((player: string | null) => {
+  if (!player) return false;
+  const today = getEffectiveDate().toDateString();
+  
+  // 1. Check if they finished a game (Cloud History)
+  const inHistory = history.some(s => s.player === player && new Date(s.timestamp).toDateString() === today);
+
+  // 2. Check if they STARTED a game locally (The Refresh/Cheat Guard)
+  const attemptKey = `addition_attempt_${player}_${today}`;
+  const hasStartedLocally = localStorage.getItem(attemptKey) === 'started';
+
+  return inHistory || hasStartedLocally;
+}, [history, getEffectiveDate]);
 
   const getTodaySession = useCallback((player: string | null) => {
     if (!player) return null;
@@ -282,13 +291,30 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   // ---------------------------------------------------------
   // 🛡️ BUBBLE WRAP: Wall Clock Timer Logic
   // ---------------------------------------------------------
+  // 🔒 UPDATED: Sets the lock immediately on start
   const startQuiz = () => {
     if (!isMarketOpenDay()) {
       alert("Trading closed today! The game is only available Monday to Friday, excluding holidays.");
       return;
     }
-    if (hasPlayedToday(selectedUser)) return;
     
+    // Double check before starting
+    if (hasPlayedToday(selectedUser)) {
+        alert("You have already used your attempt for today!");
+        return;
+    }
+    
+    // -----------------------------------------------------
+    // 🛑 THE INSTANT LOCK
+    // This prevents refreshing to restart. Once clicked, it's counted.
+    // -----------------------------------------------------
+    if (selectedUser) {
+        const today = getEffectiveDate().toDateString();
+        const attemptKey = `addition_attempt_${selectedUser}_${today}`;
+        localStorage.setItem(attemptKey, 'started');
+    }
+    // -----------------------------------------------------
+
     setQuestions(generateQuestions());
     setCurrentIndex(0);
     setUserInput('');
@@ -296,17 +322,16 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     setWrongCount(0);
     setSessionResults([]);
     
-    // Set the Indestructible Deadline
+    // Wall Clock Timer Setup
     const now = Date.now();
-    endTimeRef.current = now + 100000; // 100 seconds from now
+    endTimeRef.current = now + 100000; 
     setTimeLeft(100);
     
     setIsActive(true);
     setSubView(AdditionSubView.QUIZ);
     lastQuestionTimeRef.current = now;
-    isSubmittingRef.current = false; // Reset submission lock
+    isSubmittingRef.current = false;
   };
-
   useEffect(() => {
     if (!isActive) return;
 
