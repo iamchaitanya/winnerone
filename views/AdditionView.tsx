@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, Play, XCircle, MinusCircle, Crown, History, ChevronDown, ChevronRight, Eye, AlertCircle, Clock, CalendarX, Lock, Delete, ShieldAlert } from 'lucide-react';
 import { MARKET_HOLIDAYS_2025 } from '../types';
-import { supabase } from '../lib/supabase';
-import { PLAYER_IDS } from '../lib/constants';
+import { supabase } from '../src/lib/supabase';
+import { PLAYER_IDS } from '../src/lib/constants';
 
 interface AdditionViewProps {
   onBack: () => void;
