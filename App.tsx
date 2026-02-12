@@ -7,6 +7,8 @@ import { DashboardView } from './views/DashboardView';
 import { AdminView } from './views/AdminView';
 import { ViewType } from './types';
 
+import { supabase } from './src/lib/supabase';
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>(ViewType.HOME);
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -45,6 +47,18 @@ const App: React.FC = () => {
         return <HomeView onNavigate={setCurrentView} isDarkMode={isDarkMode} onToggleDark={toggleDarkMode} />;
     }
   };
+
+
+  useEffect(() => {
+    // Test connection to Supabase
+    supabase.from('addition_logs').select('count', { count: 'exact', head: true })
+      .then(({ count, error }) => {
+        if (error) console.error('Supabase Connection Error:', error);
+        else console.log('✅ Connected to Supabase! Row count:', count);
+      });
+  }, []);
+
+
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">

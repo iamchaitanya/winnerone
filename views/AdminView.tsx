@@ -1,6 +1,6 @@
-
 import React, { useState } from 'react';
-import { ArrowLeft, Settings, Calendar, RotateCcw, ShieldAlert, ToggleLeft, ToggleRight, Gamepad2, Clock, Lock, Key, RefreshCw, UserCheck, Trash2, AlertTriangle, Fingerprint } from 'lucide-react';
+import { ArrowLeft, Settings, Calendar, RotateCcw, ToggleLeft, ToggleRight, Gamepad2, Clock, Lock, UserCheck, Trash2, AlertTriangle, Fingerprint, ShieldAlert } from 'lucide-react';
+import { supabase } from '../src/lib/supabase'; // Import the Cloud Connection
 
 interface AdminViewProps {
   onBack: () => void;
@@ -10,6 +10,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [adminError, setAdminError] = useState('');
+  const [isResetting, setIsResetting] = useState(false); // New loading state
 
   // App settings state
   const [dateOverride, setDateOverride] = useState<string | null>(() => localStorage.getItem('addition_date_override'));
@@ -79,44 +80,59 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
     else setRiyaanAttempts(0);
   };
 
-  const handleMasterReset = () => {
-    const confirmed = window.confirm("Are you absolutely sure? This will delete ALL earnings, histories, PINs, and reset lockouts for ALL users. This cannot be undone.");
+  // ---------------------------------------------------------
+  // 🧨 THE MASTER RESET FUNCTION (Updated for Cloud)
+  // ---------------------------------------------------------
+  const handleMasterReset = async () => {
+    const confirmed = window.confirm("⚠️ DANGER ZONE ⚠️\n\nThis will permanently DELETE ALL DATA from:\n1. The Cloud Database (Supabase)\n2. This Device\n\nAre you absolutely sure?");
+    
     if (confirmed) {
-      // All possible user data keys
-      const keysToClear = [
-        'ayaan_earnings',
-        'riyaan_earnings',
-        'addition_history',
-        'ayaan_nifty_total',
-        'riyaan_nifty_total',
-        'nifty_history',
-        'pin_attempts_ayaan',
-        'pin_attempts_riyaan',
-        'pin_ayaan',
-        'pin_riyaan',
-        'addition_date_override',
-        'game_enabled_addition',
-        'game_enabled_nifty',
-        'pin_entry_enabled'
-      ];
-      
-      keysToClear.forEach(key => localStorage.removeItem(key));
-      
-      // Clear all potential pin_attempts keys (case-insensitive fallback)
-      localStorage.removeItem('pin_attempts_ayaan');
-      localStorage.removeItem('pin_attempts_riyaan');
-      
-      // Alert user and then force a reload to refresh all component states
-      alert("System has been fully reset. Re-initializing app...");
-      window.location.reload();
+      setIsResetting(true);
+      try {
+        // 1. Delete Cloud Data
+        // We use a trick (.neq 'id', '0') to select all rows because Supabase requires a filter for deletes.
+        const { error: logError } = await supabase.from('addition_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        
+        if (logError) throw logError;
+
+        // 2. Delete Local Storage
+        const keysToClear = [
+          'ayaan_earnings',
+          'riyaan_earnings',
+          'addition_history',
+          'ayaan_nifty_total',
+          'riyaan_nifty_total',
+          'nifty_history',
+          'pin_attempts_ayaan',
+          'pin_attempts_riyaan',
+          'pin_ayaan',
+          'pin_riyaan',
+          'addition_date_override',
+          'game_enabled_addition',
+          'game_enabled_nifty',
+          'pin_entry_enabled'
+        ];
+        
+        keysToClear.forEach(key => localStorage.removeItem(key));
+        
+        // Clear attempts (extra safety)
+        localStorage.removeItem('pin_attempts_ayaan');
+        localStorage.removeItem('pin_attempts_riyaan');
+        
+        alert("✅ System Fully Wiped. App will now restart.");
+        window.location.reload();
+        
+      } catch (error) {
+        console.error("Reset Failed:", error);
+        alert("❌ Error wiping cloud data. Check console for details.");
+        setIsResetting(false);
+      }
     }
   };
 
-  // Ensure the value is compatible with datetime-local (YYYY-MM-DDTHH:MM)
   const getInputValue = () => {
     if (!dateOverride) return '';
     if (dateOverride.includes('T')) return dateOverride;
-    // If it's an old-style date only string, append a default time
     return `${dateOverride}T00:00`;
   };
 
@@ -164,7 +180,6 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
           </div>
           
           <div className="space-y-6">
-            {/* PIN Entry Global Toggle */}
             <div className="flex items-center justify-between p-4 bg-indigo-50 dark:bg-indigo-900/10 rounded-2xl border border-indigo-100 dark:border-indigo-800/30 mb-2">
               <div className="flex items-center gap-3">
                 <Fingerprint size={20} className="text-indigo-600 dark:text-indigo-400" />
@@ -176,7 +191,6 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
             </div>
 
             <div className="space-y-8 pt-4 border-t border-slate-50 dark:border-slate-800">
-              {/* Ayaan Security */}
               <div className="space-y-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ayaan PIN</label>
@@ -207,7 +221,6 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
                 </div>
               </div>
 
-              {/* Riyaan Security */}
               <div className="space-y-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Riyaan PIN</label>
@@ -307,13 +320,15 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
             <h2 className="text-sm font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest">Danger Zone</h2>
           </div>
           <p className="text-[10px] font-bold text-rose-600/60 dark:text-rose-400/60 uppercase tracking-wider mb-4 px-1">
-            Careful: This action will permanently delete all scores, transaction history, and stock picks.
+            Careful: This action will permanently delete all scores from the CLOUD and this DEVICE.
           </p>
           <button 
             onClick={handleMasterReset}
-            className="w-full h-14 bg-rose-600 dark:bg-rose-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20 active:scale-95 transition-all"
+            disabled={isResetting}
+            className="w-full h-14 bg-rose-600 dark:bg-rose-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <Trash2 size={18} /> Reset All User Data
+            {isResetting ? <Clock className="animate-spin" size={18} /> : <Trash2 size={18} />}
+            {isResetting ? 'WIPING CLOUD...' : 'MASTER RESET'}
           </button>
         </div>
 

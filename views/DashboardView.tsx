@@ -1,21 +1,65 @@
-
-import React from 'react';
-import { ArrowLeft, User, Users, Trophy, Crown } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ArrowLeft, User, Users, Trophy, Crown, RefreshCw } from 'lucide-react';
+import { supabase } from '../src/lib/supabase';
+import { PLAYER_IDS } from '../src/lib/constants';
 
 interface DashboardViewProps {
   onBack: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
-  // Load real data from LocalStorage
-  const ayaanAddition = Number(localStorage.getItem('ayaan_earnings') || '0');
-  const riyaanAddition = Number(localStorage.getItem('riyaan_earnings') || '0');
-  const ayaanNifty = Number(localStorage.getItem('ayaan_nifty_total') || '0');
-  const riyaanNifty = Number(localStorage.getItem('riyaan_nifty_total') || '0');
+  const [loading, setLoading] = useState(true);
+  
+  // State for Cloud Data (Addition Game)
+  const [ayaanAddition, setAyaanAddition] = useState(0);
+  const [riyaanAddition, setRiyaanAddition] = useState(0);
+
+  // State for Local Data (Nifty Game - Not synced yet)
+  const [ayaanNifty] = useState(() => Number(localStorage.getItem('ayaan_nifty_total') || '0'));
+  const [riyaanNifty] = useState(() => Number(localStorage.getItem('riyaan_nifty_total') || '0'));
+
+  // FETCH DATA FROM CLOUD
+  useEffect(() => {
+    fetchScores();
+  }, []);
+
+  const fetchScores = async () => {
+    setLoading(true);
+    
+    // 1. Get all addition logs from Supabase
+    const { data, error } = await supabase
+      .from('addition_logs')
+      .select('player_id, earnings');
+
+    if (error) {
+      console.error('Error fetching scores:', error);
+      setLoading(false);
+      return;
+    }
+
+    // 2. Calculate Totals
+    let ayaanSum = 0;
+    let riyaanSum = 0;
+
+    if (data) {
+      data.forEach((log: any) => {
+        if (log.player_id === PLAYER_IDS.Ayaan) {
+          ayaanSum += log.earnings;
+        } else if (log.player_id === PLAYER_IDS.Riyaan) {
+          riyaanSum += log.earnings;
+        }
+      });
+    }
+
+    // 3. Update State
+    setAyaanAddition(ayaanSum);
+    setRiyaanAddition(riyaanSum);
+    setLoading(false);
+  };
 
   const ayaanTotal = ayaanAddition + ayaanNifty;
   const riyaanTotal = riyaanAddition + riyaanNifty;
-  const grandTotal = Math.abs(ayaanTotal) + Math.abs(riyaanTotal); // Use abs for better ratio visualization
+  const grandTotal = Math.abs(ayaanTotal) + Math.abs(riyaanTotal);
 
   const isAyaanLeading = ayaanTotal >= riyaanTotal;
   const leader = isAyaanLeading ? { name: 'Ayaan', total: ayaanTotal, color: 'indigo' } : { name: 'Riyaan', total: riyaanTotal, color: 'rose' };
@@ -24,13 +68,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 animate-in slide-in-from-right duration-300 pb-24 overflow-x-hidden">
       {/* Header */}
       <header className="p-6 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 sticky top-0 z-30 backdrop-blur-md bg-white/80 dark:bg-slate-900/80">
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
-            <ArrowLeft size={24} />
-          </button>
-          <div>
-            <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Master Dashboard</h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
+              <ArrowLeft size={24} />
+            </button>
+            <div>
+              <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Master Dashboard</h1>
+              <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Live Cloud Sync
+              </p>
+            </div>
           </div>
+          <button onClick={fetchScores} disabled={loading} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors">
+            <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+          </button>
         </div>
       </header>
 
@@ -52,13 +105,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Addition</p>
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Addition (Cloud)</p>
                 <p className={`text-sm font-black ${ayaanAddition < 0 ? 'text-rose-500' : 'text-indigo-600 dark:text-indigo-400'}`}>
-                  ₹{ayaanAddition.toLocaleString()}
+                  {loading ? '...' : `₹${ayaanAddition.toLocaleString()}`}
                 </p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50</p>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 opacity-60">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50 (Local)</p>
                 <p className={`text-sm font-black ${ayaanNifty < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   ₹{ayaanNifty.toLocaleString()}
                 </p>
@@ -81,13 +134,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Addition</p>
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Addition (Cloud)</p>
                 <p className={`text-sm font-black ${riyaanAddition < 0 ? 'text-rose-500' : 'text-rose-600 dark:text-rose-400'}`}>
-                  ₹{riyaanAddition.toLocaleString()}
+                  {loading ? '...' : `₹${riyaanAddition.toLocaleString()}`}
                 </p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50</p>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 opacity-60">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50 (Local)</p>
                 <p className={`text-sm font-black ${riyaanNifty < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   ₹{riyaanNifty.toLocaleString()}
                 </p>

@@ -3,6 +3,9 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, Play, XCircle, MinusCircle, Crown, History, ChevronDown, ChevronRight, Calendar, Eye, AlertCircle, Clock, CalendarX, Lock, Delete, ShieldAlert } from 'lucide-react';
 import { MARKET_HOLIDAYS_2025 } from '../types';
 
+import { supabase } from '../src/lib/supabase';
+import { PLAYER_IDS } from '../src/lib/constants';
+
 interface AdditionViewProps {
   onBack: () => void;
 }
@@ -72,6 +75,59 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     const saved = localStorage.getItem('addition_history');
     return saved ? JSON.parse(saved) : [];
   });
+
+
+// ---------------------------------------------------------
+  // ☁️ CLOUD SYNC: Download latest scores on mount
+  // ---------------------------------------------------------
+  useEffect(() => {
+    const syncWithCloud = async () => {
+      // 1. Fetch all logs from Supabase
+      const { data, error } = await supabase
+        .from('addition_logs')
+        .select('*')
+        .order('played_at', { ascending: false })
+        .limit(500); // Fetch last 500 games
+
+      if (error || !data) {
+        console.error("Sync Error:", error);
+        return;
+      }
+
+      // 2. Calculate Real-Time Totals
+      let aTotal = 0;
+      let rTotal = 0;
+      
+      // 3. Convert Cloud Data to App Format
+      const cloudHistory: GameSession[] = data.map((log: any) => {
+        // Sum up totals while we loop
+        if (log.player_id === PLAYER_IDS.Ayaan) aTotal += log.earnings;
+        if (log.player_id === PLAYER_IDS.Riyaan) rTotal += log.earnings;
+
+        // Convert database row to GameSession object
+        return {
+          id: log.id,
+          player: log.player_id === PLAYER_IDS.Ayaan ? 'Ayaan' : 'Riyaan',
+          score: log.score,
+          wrong: log.wrong_count,
+          earnings: log.earnings,
+          timestamp: new Date(log.played_at).getTime(),
+          results: log.details
+        };
+      });
+
+      // 4. Update the App State
+      setAyaanTotal(aTotal);
+      setRiyaanTotal(rTotal);
+      setHistory(cloudHistory);
+      
+      console.log("✅ Addition View fully synced with Cloud!");
+    };
+
+    syncWithCloud();
+  }, []);
+  // ---------------------------------------------------------
+
 
   // Helper to get effective current date
   const getEffectiveDate = useCallback(() => {
@@ -171,20 +227,21 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     return newQuestions;
   }, []);
 
-  const finishQuiz = useCallback((fScore?: number, fWrong?: number, fResults?: QuestionResult[]) => {
+  const finishQuiz = useCallback(async (fScore?: number, fWrong?: number, fResults?: QuestionResult[]) => {
     setIsActive(false);
     
-    // Use passed values or current state (fallback for timer expiration)
+    // 1. Calculate final stats
     const s = fScore !== undefined ? fScore : score;
     const w = fWrong !== undefined ? fWrong : wrongCount;
     const results = fResults !== undefined ? fResults : sessionResults;
     const earnings = s - w;
     
-    // Update display states for Results view
+    // 2. Update Local State (So the UI updates instantly)
     setFinalScore(s);
     setFinalWrong(w);
     setFinalSessionEarnings(earnings);
 
+    // 3. Update Local Storage (Backup)
     if (selectedUser === 'Ayaan') {
       const newVal = ayaanTotal + earnings;
       setAyaanTotal(newVal);
@@ -197,6 +254,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
 
     const effectiveTime = getEffectiveDate().getTime();
 
+    // 4. Update Local History
     const newSession: GameSession = {
       id: Math.random().toString(36).substr(2, 9),
       player: selectedUser || 'Unknown',
@@ -209,6 +267,31 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     const updatedHistory = [newSession, ...history].slice(0, 500);
     setHistory(updatedHistory);
     localStorage.setItem('addition_history', JSON.stringify(updatedHistory));
+
+    // ---------------------------------------------------------
+    // 5. ☁️ CLOUD SYNC (The New Part)
+    // ---------------------------------------------------------
+    if (selectedUser && (selectedUser === 'Ayaan' || selectedUser === 'Riyaan')) {
+      const playerId = PLAYER_IDS[selectedUser];
+      
+      const { error } = await supabase.from('addition_logs').insert({
+        player_id: playerId,
+        score: s,
+        wrong_count: w,
+        earnings: earnings,
+        details: results, // We save the full question history!
+        played_at: new Date(effectiveTime).toISOString()
+      });
+
+      if (error) {
+        console.error("❌ Failed to save to Supabase:", error);
+        alert("Warning: Score saved locally but failed to upload. Check internet.");
+      } else {
+        console.log("✅ Score safely uploaded to the cloud!");
+      }
+    }
+    // ---------------------------------------------------------
+
     setSubView(AdditionSubView.RESULTS);
   }, [score, wrongCount, selectedUser, ayaanTotal, riyaanTotal, history, sessionResults, getEffectiveDate]);
 
