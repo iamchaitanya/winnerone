@@ -68,6 +68,13 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   // Ref for tracking question timing
   const lastQuestionTimeRef = useRef<number>(0);
 
+  // ... inside AdditionView component ...
+
+// Add this new Ref near your other refs (around line 75)
+const endTimeRef = useRef<number>(0);
+
+// ... keep existing state ...
+
   // Persistent State
   const [ayaanTotal, setAyaanTotal] = useState<number>(() => Number(localStorage.getItem('ayaan_earnings') || '0'));
   const [riyaanTotal, setRiyaanTotal] = useState<number>(() => Number(localStorage.getItem('riyaan_earnings') || '0'));
@@ -305,30 +312,44 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
       return;
     }
     if (hasPlayedToday(selectedUser)) return;
+    
     setQuestions(generateQuestions());
     setCurrentIndex(0);
     setUserInput('');
     setScore(0);
     setWrongCount(0);
+    
+    // START FIX: Set the target end time (Now + 100 seconds)
+    const now = Date.now();
+    endTimeRef.current = now + 100000; // 100,000 ms = 100 seconds
     setTimeLeft(100);
+    // END FIX
+
     setSessionResults([]);
     setIsActive(true);
     setSubView(AdditionSubView.QUIZ);
-    lastQuestionTimeRef.current = Date.now();
+    lastQuestionTimeRef.current = now; // Ensure this uses 'now' variable
   };
 
   useEffect(() => {
     if (!isActive) return;
+
     const interval = window.setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          finishRef.current();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+      const now = Date.now();
+      // Calculate how many seconds are actually left based on the Target End Time
+      const secondsRemaining = Math.ceil((endTimeRef.current - now) / 1000);
+
+      if (secondsRemaining <= 0) {
+        // Time is up!
+        setTimeLeft(0);
+        clearInterval(interval);
+        finishRef.current();
+      } else {
+        // Update the display
+        setTimeLeft(secondsRemaining);
+      }
+    }, 1000); // Check every second
+
     return () => clearInterval(interval);
   }, [isActive]);
 
