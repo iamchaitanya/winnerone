@@ -1,10 +1,8 @@
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, Play, XCircle, MinusCircle, Crown, History, ChevronDown, ChevronRight, Calendar, Eye, AlertCircle, Clock, CalendarX, Lock, Delete, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, Play, XCircle, MinusCircle, Crown, History, ChevronDown, ChevronRight, Eye, AlertCircle, Clock, CalendarX, Lock, Delete, ShieldAlert } from 'lucide-react';
 import { MARKET_HOLIDAYS_2025 } from '../types';
-
-import { supabase } from '../src/lib/supabase';
-import { PLAYER_IDS } from '../src/lib/constants';
+import { supabase } from '../lib/supabase';
+import { PLAYER_IDS } from '../lib/constants';
 
 interface AdditionViewProps {
   onBack: () => void;
@@ -30,7 +28,7 @@ interface Question {
 interface QuestionResult extends Question {
   userAnswer: number;
   isCorrect: boolean;
-  timeTaken?: number; // In seconds
+  timeTaken?: number;
 }
 
 interface GameSession {
@@ -65,27 +63,18 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const [dateOverride] = useState<string | null>(() => localStorage.getItem('addition_date_override'));
   const isPinEntryEnabled = localStorage.getItem('pin_entry_enabled') !== 'false';
 
-  // Ref for tracking question timing
+  // Refs for Indestructible Logic
   const lastQuestionTimeRef = useRef<number>(0);
-
-  // ... inside AdditionView component ...
-
-// Add this new Ref near your other refs (around line 75)
-const endTimeRef = useRef<number>(0);
-
-// ... keep existing state ...
+  const endTimeRef = useRef<number>(0); // The "Wall Clock" Deadline
+  const isSubmittingRef = useRef(false); // Prevents double submissions
 
   // Persistent State
-  const [ayaanTotal, setAyaanTotal] = useState<number>(() => Number(localStorage.getItem('ayaan_earnings') || '0'));
-  const [riyaanTotal, setRiyaanTotal] = useState<number>(() => Number(localStorage.getItem('riyaan_earnings') || '0'));
-  const [history, setHistory] = useState<GameSession[]>(() => {
-    const saved = localStorage.getItem('addition_history');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [ayaanTotal, setAyaanTotal] = useState<number>(0);
+  const [riyaanTotal, setRiyaanTotal] = useState<number>(0);
+  const [history, setHistory] = useState<GameSession[]>([]);
 
-
-// ---------------------------------------------------------
-  // ☁️ CLOUD SYNC: Download latest scores on mount
+  // ---------------------------------------------------------
+  // 🛡️ BUBBLE WRAP: Cloud Sync on Mount
   // ---------------------------------------------------------
   useEffect(() => {
     const syncWithCloud = async () => {
@@ -94,24 +83,21 @@ const endTimeRef = useRef<number>(0);
         .from('addition_logs')
         .select('*')
         .order('played_at', { ascending: false })
-        .limit(500); // Fetch last 500 games
+        .limit(500);
 
       if (error || !data) {
         console.error("Sync Error:", error);
         return;
       }
 
-      // 2. Calculate Real-Time Totals
+      // 2. Calculate Totals Locally
       let aTotal = 0;
       let rTotal = 0;
       
-      // 3. Convert Cloud Data to App Format
       const cloudHistory: GameSession[] = data.map((log: any) => {
-        // Sum up totals while we loop
         if (log.player_id === PLAYER_IDS.Ayaan) aTotal += log.earnings;
         if (log.player_id === PLAYER_IDS.Riyaan) rTotal += log.earnings;
 
-        // Convert database row to GameSession object
         return {
           id: log.id,
           player: log.player_id === PLAYER_IDS.Ayaan ? 'Ayaan' : 'Riyaan',
@@ -123,11 +109,9 @@ const endTimeRef = useRef<number>(0);
         };
       });
 
-      // 4. Update the App State
       setAyaanTotal(aTotal);
       setRiyaanTotal(rTotal);
       setHistory(cloudHistory);
-      
       console.log("✅ Addition View fully synced with Cloud!");
     };
 
@@ -135,13 +119,10 @@ const endTimeRef = useRef<number>(0);
   }, []);
   // ---------------------------------------------------------
 
-
-  // Helper to get effective current date
   const getEffectiveDate = useCallback(() => {
     if (dateOverride) {
       const d = new Date(dateOverride);
       if (isNaN(d.getTime())) return new Date();
-
       if (!dateOverride.includes('T')) {
         const now = new Date();
         const [y, m, day] = dateOverride.split('-').map(Number);
@@ -150,7 +131,6 @@ const endTimeRef = useRef<number>(0);
         localDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
         return localDate;
       }
-      
       const now = new Date();
       d.setSeconds(now.getSeconds(), now.getMilliseconds());
       return d;
@@ -158,10 +138,9 @@ const endTimeRef = useRef<number>(0);
     return new Date();
   }, [dateOverride]);
 
-  // Market Day Helpers
   const isWeekend = useCallback((date: Date) => {
     const day = date.getDay();
-    return day === 0 || day === 6; // Sunday or Saturday
+    return day === 0 || day === 6;
   }, []);
 
   const isPublicHoliday = useCallback((date: Date) => {
@@ -174,7 +153,6 @@ const endTimeRef = useRef<number>(0);
     return !isWeekend(d) && !isPublicHoliday(d);
   }, [getEffectiveDate, isWeekend, isPublicHoliday]);
 
-  // Lockout logic
   const getUserAttempts = (user: string | null) => {
     if (!user) return 0;
     return Number(localStorage.getItem(`pin_attempts_${user.toLowerCase()}`) || '0');
@@ -195,7 +173,6 @@ const endTimeRef = useRef<number>(0);
     localStorage.setItem(`pin_attempts_${user.toLowerCase()}`, '0');
   };
 
-  // Quiz State
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userInput, setUserInput] = useState('');
@@ -205,7 +182,6 @@ const endTimeRef = useRef<number>(0);
   const [isActive, setIsActive] = useState(false);
   const [sessionResults, setSessionResults] = useState<QuestionResult[]>([]);
   
-  // Track final state to avoid reading stale variables during transition
   const [finalSessionEarnings, setFinalSessionEarnings] = useState(0);
   const [finalScore, setFinalScore] = useState(0);
   const [finalWrong, setFinalWrong] = useState(0);
@@ -234,36 +210,37 @@ const endTimeRef = useRef<number>(0);
     return newQuestions;
   }, []);
 
+  // ---------------------------------------------------------
+  // 🛡️ BUBBLE WRAP: The Safe Finish Function
+  // ---------------------------------------------------------
   const finishQuiz = useCallback(async (fScore?: number, fWrong?: number, fResults?: QuestionResult[]) => {
+    // Prevent double submission
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    
     setIsActive(false);
     
-    // 1. Calculate final stats
     const s = fScore !== undefined ? fScore : score;
     const w = fWrong !== undefined ? fWrong : wrongCount;
     const results = fResults !== undefined ? fResults : sessionResults;
     const earnings = s - w;
     
-    // 2. Update Local State (So the UI updates instantly)
     setFinalScore(s);
     setFinalWrong(w);
     setFinalSessionEarnings(earnings);
 
-    // 3. Update Local Storage (Backup)
+    // Update Local Display State Immediately
     if (selectedUser === 'Ayaan') {
-      const newVal = ayaanTotal + earnings;
-      setAyaanTotal(newVal);
-      localStorage.setItem('ayaan_earnings', newVal.toString());
+      setAyaanTotal(prev => prev + earnings);
     } else if (selectedUser === 'Riyaan') {
-      const newVal = riyaanTotal + earnings;
-      setRiyaanTotal(newVal);
-      localStorage.setItem('riyaan_earnings', newVal.toString());
+      setRiyaanTotal(prev => prev + earnings);
     }
 
     const effectiveTime = getEffectiveDate().getTime();
-
-    // 4. Update Local History
+    
+    // Create Temporary Local Session (for instant feedback)
     const newSession: GameSession = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: 'temp-' + Date.now(),
       player: selectedUser || 'Unknown',
       score: s,
       wrong: w,
@@ -271,13 +248,9 @@ const endTimeRef = useRef<number>(0);
       timestamp: effectiveTime,
       results: results
     };
-    const updatedHistory = [newSession, ...history].slice(0, 500);
-    setHistory(updatedHistory);
-    localStorage.setItem('addition_history', JSON.stringify(updatedHistory));
+    setHistory(prev => [newSession, ...prev].slice(0, 500));
 
-    // ---------------------------------------------------------
-    // 5. ☁️ CLOUD SYNC (The New Part)
-    // ---------------------------------------------------------
+    // ☁️ Cloud Upload
     if (selectedUser && (selectedUser === 'Ayaan' || selectedUser === 'Riyaan')) {
       const playerId = PLAYER_IDS[selectedUser];
       
@@ -286,7 +259,7 @@ const endTimeRef = useRef<number>(0);
         score: s,
         wrong_count: w,
         earnings: earnings,
-        details: results, // We save the full question history!
+        details: results,
         played_at: new Date(effectiveTime).toISOString()
       });
 
@@ -294,18 +267,21 @@ const endTimeRef = useRef<number>(0);
         console.error("❌ Failed to save to Supabase:", error);
         alert("Warning: Score saved locally but failed to upload. Check internet.");
       } else {
-        console.log("✅ Score safely uploaded to the cloud!");
+        console.log("✅ Score uploaded!");
       }
     }
-    // ---------------------------------------------------------
 
     setSubView(AdditionSubView.RESULTS);
-  }, [score, wrongCount, selectedUser, ayaanTotal, riyaanTotal, history, sessionResults, getEffectiveDate]);
+    isSubmittingRef.current = false; // Reset lock
+  }, [score, wrongCount, selectedUser, sessionResults, getEffectiveDate]);
 
   useEffect(() => {
     finishRef.current = finishQuiz;
   }, [finishQuiz]);
 
+  // ---------------------------------------------------------
+  // 🛡️ BUBBLE WRAP: Wall Clock Timer Logic
+  // ---------------------------------------------------------
   const startQuiz = () => {
     if (!isMarketOpenDay()) {
       alert("Trading closed today! The game is only available Monday to Friday, excluding holidays.");
@@ -318,17 +294,17 @@ const endTimeRef = useRef<number>(0);
     setUserInput('');
     setScore(0);
     setWrongCount(0);
-    
-    // START FIX: Set the target end time (Now + 100 seconds)
-    const now = Date.now();
-    endTimeRef.current = now + 100000; // 100,000 ms = 100 seconds
-    setTimeLeft(100);
-    // END FIX
-
     setSessionResults([]);
+    
+    // Set the Indestructible Deadline
+    const now = Date.now();
+    endTimeRef.current = now + 100000; // 100 seconds from now
+    setTimeLeft(100);
+    
     setIsActive(true);
     setSubView(AdditionSubView.QUIZ);
-    lastQuestionTimeRef.current = now; // Ensure this uses 'now' variable
+    lastQuestionTimeRef.current = now;
+    isSubmittingRef.current = false; // Reset submission lock
   };
 
   useEffect(() => {
@@ -336,22 +312,21 @@ const endTimeRef = useRef<number>(0);
 
     const interval = window.setInterval(() => {
       const now = Date.now();
-      // Calculate how many seconds are actually left based on the Target End Time
+      // Calculate real time remaining
       const secondsRemaining = Math.ceil((endTimeRef.current - now) / 1000);
 
       if (secondsRemaining <= 0) {
-        // Time is up!
         setTimeLeft(0);
         clearInterval(interval);
-        finishRef.current();
+        finishRef.current(); // Finish immediately if time is up
       } else {
-        // Update the display
         setTimeLeft(secondsRemaining);
       }
-    }, 1000); // Check every second
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [isActive]);
+  // ---------------------------------------------------------
 
   const handleKeyClick = (val: string) => {
     if (userInput.length < 3) {
@@ -390,11 +365,11 @@ const endTimeRef = useRef<number>(0);
         setUserInput('');
       }, 100);
     } else {
-      // Pass the fully updated values to finishQuiz to avoid stale state
       finishQuiz(nextScore, nextWrong, nextResults);
     }
   };
 
+  // ... (User Selection, PIN Entry, History Views remain standard)
   const handleUserSelect = (user: string) => {
     setSelectedUser(user);
     if (isPinEntryEnabled) {
@@ -434,7 +409,6 @@ const endTimeRef = useRef<number>(0);
     } else {
       setPinError(true);
       incrementAttempts(selectedUser!);
-      // Delay clearing to allow shake animation to be seen
       setTimeout(() => {
         setPinInput('');
         setPinError(false);
@@ -589,6 +563,7 @@ const endTimeRef = useRef<number>(0);
     );
   }
 
+  // ... (PIN ENTRY, HISTORY, PRE_ENTRY, RESULTS, REVIEW, DASHBOARD views are identical to before, included in copy-paste)
   if (subView === AdditionSubView.PIN_ENTRY) {
     const locked = isUserLocked(selectedUser);
     const attempts = getUserAttempts(selectedUser);
@@ -667,97 +642,6 @@ const endTimeRef = useRef<number>(0);
         )}
 
         <button onClick={() => setSubView(AdditionSubView.HUB)} className="mt-12 text-slate-400 font-bold text-sm uppercase tracking-widest">Back</button>
-      </div>
-    );
-  }
-
-  if (subView === AdditionSubView.MASTER_HISTORY) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 animate-in slide-in-from-right duration-300">
-        <header className="flex flex-col gap-6 mb-8 max-w-lg mx-auto w-full">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setSubView(AdditionSubView.HUB)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
-              <ArrowLeft size={24} />
-            </button>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Question History</h1>
-          </div>
-          
-          <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-2xl w-full">
-            {(['Ayaan', 'Riyaan'] as const).map(filter => (
-              <button
-                key={filter}
-                onClick={() => setHistoryFilter(filter)}
-                className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                  historyFilter === filter 
-                    ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm' 
-                    : 'text-slate-400 hover:text-slate-600'
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
-        </header>
-
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden mb-12 max-w-lg mx-auto w-full">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left table-auto">
-              <thead>
-                <tr className="border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ques</th>
-                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Ans</th>
-                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Corr</th>
-                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Time</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                {masterQuestionHistory.length > 0 ? (
-                  masterQuestionHistory.map((res, idx) => (
-                    <tr 
-                      key={idx} 
-                      className={`transition-colors ${res.isCorrect 
-                        ? 'bg-emerald-50/30 dark:bg-emerald-900/10 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' 
-                        : 'bg-rose-50/30 dark:bg-rose-900/10 hover:bg-rose-50 dark:hover:bg-rose-900/20'
-                      }`}
-                    >
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="text-sm font-black text-slate-900 dark:text-slate-100 tabular-nums">
-                          {res.num1} + {res.num2}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        <span className={`text-sm font-black tabular-nums ${res.isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                          {res.userAnswer}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
-                          {res.answer}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-[11px] font-bold text-slate-400 tabular-nums uppercase">
-                          {res.timeTaken ? `${res.timeTaken.toFixed(1)}s` : '-'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={4} className="px-5 py-24 text-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-full">
-                          <History size={32} className="text-slate-200 dark:text-slate-600" />
-                        </div>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">No records found</p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
     );
   }
@@ -1046,6 +930,97 @@ const endTimeRef = useRef<number>(0);
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (subView === AdditionSubView.MASTER_HISTORY) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 animate-in slide-in-from-right duration-300">
+        <header className="flex flex-col gap-6 mb-8 max-w-lg mx-auto w-full">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setSubView(AdditionSubView.HUB)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
+              <ArrowLeft size={24} />
+            </button>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Question History</h1>
+          </div>
+          
+          <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-2xl w-full">
+            {(['Ayaan', 'Riyaan'] as const).map(filter => (
+              <button
+                key={filter}
+                onClick={() => setHistoryFilter(filter)}
+                className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                  historyFilter === filter 
+                    ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        </header>
+
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden mb-12 max-w-lg mx-auto w-full">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left table-auto">
+              <thead>
+                <tr className="border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ques</th>
+                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Ans</th>
+                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Corr</th>
+                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Time</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                {masterQuestionHistory.length > 0 ? (
+                  masterQuestionHistory.map((res, idx) => (
+                    <tr 
+                      key={idx} 
+                      className={`transition-colors ${res.isCorrect 
+                        ? 'bg-emerald-50/30 dark:bg-emerald-900/10 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' 
+                        : 'bg-rose-50/30 dark:bg-rose-900/10 hover:bg-rose-50 dark:hover:bg-rose-900/20'
+                      }`}
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="text-sm font-black text-slate-900 dark:text-slate-100 tabular-nums">
+                          {res.num1} + {res.num2}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span className={`text-sm font-black tabular-nums ${res.isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                          {res.userAnswer}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
+                          {res.answer}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-[11px] font-bold text-slate-400 tabular-nums uppercase">
+                          {res.timeTaken ? `${res.timeTaken.toFixed(1)}s` : '-'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-24 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-full">
+                          <History size={32} className="text-slate-200 dark:text-slate-600" />
+                        </div>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">No records found</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
