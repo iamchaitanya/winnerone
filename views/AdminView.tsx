@@ -1,18 +1,9 @@
 
 import React, { useState } from 'react';
-import { ArrowLeft, Lock, Settings, Calendar, RotateCcw, ShieldAlert, Trash2, History, Clock, ToggleLeft, ToggleRight, Gamepad2 } from 'lucide-react';
+import { ArrowLeft, Settings, Calendar, RotateCcw, ShieldAlert, ToggleLeft, ToggleRight, Gamepad2, Clock, Lock, Key, RefreshCw, UserCheck, Trash2, AlertTriangle, Fingerprint } from 'lucide-react';
 
 interface AdminViewProps {
   onBack: () => void;
-}
-
-interface GameSession {
-  id: string;
-  player: string;
-  score: number;
-  wrong: number;
-  earnings: number;
-  timestamp: number;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
@@ -24,13 +15,13 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
   const [dateOverride, setDateOverride] = useState<string | null>(() => localStorage.getItem('addition_date_override'));
   const [isAdditionEnabled, setIsAdditionEnabled] = useState(() => localStorage.getItem('game_enabled_addition') !== 'false');
   const [isNiftyEnabled, setIsNiftyEnabled] = useState(() => localStorage.getItem('game_enabled_nifty') !== 'false');
-
-  const [history, setHistory] = useState<GameSession[]>(() => {
-    const saved = localStorage.getItem('addition_history');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [ayaanTotal, setAyaanTotal] = useState<number>(() => Number(localStorage.getItem('ayaan_earnings') || '0'));
-  const [riyaanTotal, setRiyaanTotal] = useState<number>(() => Number(localStorage.getItem('riyaan_earnings') || '0'));
+  const [isPinEntryEnabled, setIsPinEntryEnabled] = useState(() => localStorage.getItem('pin_entry_enabled') !== 'false');
+  
+  // User PINs & Attempts
+  const [ayaanPin, setAyaanPin] = useState(() => localStorage.getItem('pin_ayaan') || '123456');
+  const [riyaanPin, setRiyaanPin] = useState(() => localStorage.getItem('pin_riyaan') || '654321');
+  const [ayaanAttempts, setAyaanAttempts] = useState(() => Number(localStorage.getItem('pin_attempts_ayaan') || '0'));
+  const [riyaanAttempts, setRiyaanAttempts] = useState(() => Number(localStorage.getItem('pin_attempts_riyaan') || '0'));
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +45,12 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
     localStorage.setItem('game_enabled_nifty', newVal.toString());
   };
 
+  const togglePinEntry = () => {
+    const newVal = !isPinEntryEnabled;
+    setIsPinEntryEnabled(newVal);
+    localStorage.setItem('pin_entry_enabled', newVal.toString());
+  };
+
   const updateDateOverride = (val: string) => {
     setDateOverride(val);
     localStorage.setItem('addition_date_override', val);
@@ -64,42 +61,63 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
     localStorage.removeItem('addition_date_override');
   };
 
-  const deleteSession = (sessionId: string) => {
-    const sessionToDelete = history.find(s => s.id === sessionId);
-    if (!sessionToDelete) return;
-
-    if (sessionToDelete.player === 'Ayaan') {
-      const newVal = Math.max(0, ayaanTotal - sessionToDelete.earnings);
-      setAyaanTotal(newVal);
-      localStorage.setItem('ayaan_earnings', newVal.toString());
-    } else {
-      const newVal = Math.max(0, riyaanTotal - sessionToDelete.earnings);
-      setRiyaanTotal(newVal);
-      localStorage.setItem('riyaan_earnings', newVal.toString());
+  const updatePin = (user: 'ayaan' | 'riyaan', val: string) => {
+    if (val.length <= 6 && /^\d*$/.test(val)) {
+      if (user === 'ayaan') {
+        setAyaanPin(val);
+        localStorage.setItem('pin_ayaan', val);
+      } else {
+        setRiyaanPin(val);
+        localStorage.setItem('pin_riyaan', val);
+      }
     }
-
-    const updatedHistory = history.filter(s => s.id !== sessionId);
-    setHistory(updatedHistory);
-    localStorage.setItem('addition_history', JSON.stringify(updatedHistory));
   };
 
-  const resetAllData = () => {
-    if (confirm('Are you absolutely sure? This will delete all scores and history across the app.')) {
-      setAyaanTotal(0);
-      setRiyaanTotal(0);
-      setHistory([]);
-      localStorage.removeItem('ayaan_earnings');
-      localStorage.removeItem('riyaan_earnings');
-      localStorage.removeItem('addition_history');
-      localStorage.removeItem('addition_date_override');
+  const resetUserLock = (user: 'ayaan' | 'riyaan') => {
+    localStorage.setItem(`pin_attempts_${user}`, '0');
+    if (user === 'ayaan') setAyaanAttempts(0);
+    else setRiyaanAttempts(0);
+  };
+
+  const handleMasterReset = () => {
+    const confirmed = window.confirm("Are you absolutely sure? This will delete ALL earnings, histories, PINs, and reset lockouts for ALL users. This cannot be undone.");
+    if (confirmed) {
+      // All possible user data keys
+      const keysToClear = [
+        'ayaan_earnings',
+        'riyaan_earnings',
+        'addition_history',
+        'ayaan_nifty_total',
+        'riyaan_nifty_total',
+        'nifty_history',
+        'pin_attempts_ayaan',
+        'pin_attempts_riyaan',
+        'pin_ayaan',
+        'pin_riyaan',
+        'addition_date_override',
+        'game_enabled_addition',
+        'game_enabled_nifty',
+        'pin_entry_enabled'
+      ];
       
-      // Nifty Specific reset
-      localStorage.removeItem('ayaan_nifty_total');
-      localStorage.removeItem('riyaan_nifty_total');
-      localStorage.removeItem('nifty_history');
+      keysToClear.forEach(key => localStorage.removeItem(key));
       
-      setDateOverride(null);
+      // Clear all potential pin_attempts keys (case-insensitive fallback)
+      localStorage.removeItem('pin_attempts_ayaan');
+      localStorage.removeItem('pin_attempts_riyaan');
+      
+      // Alert user and then force a reload to refresh all component states
+      alert("System has been fully reset. Re-initializing app...");
+      window.location.reload();
     }
+  };
+
+  // Ensure the value is compatible with datetime-local (YYYY-MM-DDTHH:MM)
+  const getInputValue = () => {
+    if (!dateOverride) return '';
+    if (dateOverride.includes('T')) return dateOverride;
+    // If it's an old-style date only string, append a default time
+    return `${dateOverride}T00:00`;
   };
 
   if (!isAuthenticated) {
@@ -138,6 +156,91 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
       </header>
 
       <div className="space-y-6 pb-24 max-w-md mx-auto">
+        {/* User Security Management */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-6">
+            <Lock size={20} className="text-indigo-500" />
+            <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Security Management</h2>
+          </div>
+          
+          <div className="space-y-6">
+            {/* PIN Entry Global Toggle */}
+            <div className="flex items-center justify-between p-4 bg-indigo-50 dark:bg-indigo-900/10 rounded-2xl border border-indigo-100 dark:border-indigo-800/30 mb-2">
+              <div className="flex items-center gap-3">
+                <Fingerprint size={20} className="text-indigo-600 dark:text-indigo-400" />
+                <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Require User PIN</span>
+              </div>
+              <button onClick={togglePinEntry} className="transition-colors">
+                {isPinEntryEnabled ? <ToggleRight size={32} className="text-indigo-600" /> : <ToggleLeft size={32} className="text-slate-300 dark:text-slate-700" />}
+              </button>
+            </div>
+
+            <div className="space-y-8 pt-4 border-t border-slate-50 dark:border-slate-800">
+              {/* Ayaan Security */}
+              <div className="space-y-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ayaan PIN</label>
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    maxLength={6}
+                    className="w-full h-14 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 px-4 font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none transition-all tabular-nums tracking-[0.2em]"
+                    value={ayaanPin}
+                    onChange={(e) => updatePin('ayaan', e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-400 uppercase">Ayaan Attempts</span>
+                    <span className={`text-sm font-black ${ayaanAttempts >= 3 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                      {ayaanAttempts}/3 attempts {ayaanAttempts >= 3 && '(LOCKED)'}
+                    </span>
+                  </div>
+                  {ayaanAttempts > 0 && (
+                    <button 
+                      onClick={() => resetUserLock('ayaan')}
+                      className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 transition-colors"
+                    >
+                      <UserCheck size={20} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Riyaan Security */}
+              <div className="space-y-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Riyaan PIN</label>
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    maxLength={6}
+                    className="w-full h-14 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 px-4 font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none transition-all tabular-nums tracking-[0.2em]"
+                    value={riyaanPin}
+                    onChange={(e) => updatePin('riyaan', e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-400 uppercase">Riyaan Attempts</span>
+                    <span className={`text-sm font-black ${riyaanAttempts >= 3 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                      {riyaanAttempts}/3 attempts {riyaanAttempts >= 3 && '(LOCKED)'}
+                    </span>
+                  </div>
+                  {riyaanAttempts > 0 && (
+                    <button 
+                      onClick={() => resetUserLock('riyaan')}
+                      className="p-3 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-xl hover:bg-rose-100 transition-colors"
+                    >
+                      <UserCheck size={20} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Game Management */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
@@ -164,16 +267,16 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
             <Calendar size={20} className="text-indigo-500" />
-            <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">System Date</h2>
+            <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">System Time Machine</h2>
           </div>
           
           <div className="space-y-4">
             <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Override Date</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Override Date & Time</label>
               <input 
-                type="date" 
+                type="datetime-local" 
                 className="w-full h-14 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 px-4 font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none transition-all"
-                value={dateOverride || ''}
+                value={getInputValue()}
                 onChange={(e) => updateDateOverride(e.target.value)}
               />
             </div>
@@ -189,57 +292,35 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
             
             {!dateOverride && (
               <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-800/30">
-                <p className="text-emerald-700 dark:text-emerald-400 text-xs font-bold leading-relaxed">
-                  Currently using actual real-time: <span className="tabular-nums">{new Date().toDateString()}</span>
+                <p className="text-emerald-700 dark:text-emerald-400 text-xs font-bold leading-relaxed flex items-center gap-2">
+                  <Clock size={14} /> Currently Live: <span className="tabular-nums">{new Date().toLocaleString()}</span>
                 </p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Master Controls */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
+        {/* Danger Zone */}
+        <div className="bg-rose-50 dark:bg-rose-950/20 rounded-3xl border border-rose-100 dark:border-rose-900/30 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
-            <ShieldAlert size={20} className="text-rose-500" />
-            <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Master Controls</h2>
+            <AlertTriangle size={20} className="text-rose-500" />
+            <h2 className="text-sm font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest">Danger Zone</h2>
           </div>
+          <p className="text-[10px] font-bold text-rose-600/60 dark:text-rose-400/60 uppercase tracking-wider mb-4 px-1">
+            Careful: This action will permanently delete all scores, transaction history, and stock picks.
+          </p>
           <button 
-            onClick={resetAllData}
-            className="w-full h-14 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-800/50 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 active:bg-rose-100 transition-colors"
+            onClick={handleMasterReset}
+            className="w-full h-14 bg-rose-600 dark:bg-rose-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20 active:scale-95 transition-all"
           >
-            <Trash2 size={18} /> Reset All App Data
+            <Trash2 size={18} /> Reset All User Data
           </button>
         </div>
 
-        {/* Manage Sessions */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
-          <div className="p-6 border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-            <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
-              <History size={18} className="text-indigo-500" /> Manage Sessions
-            </h2>
-          </div>
-          <div className="divide-y divide-slate-50 dark:divide-slate-800">
-            {history.length > 0 ? history.map((session) => (
-              <div key={session.id} className="p-4 flex items-center justify-between group">
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-slate-900 dark:text-white uppercase">{session.player}</span>
-                    <span className="text-[10px] font-bold text-slate-400 tabular-nums">{new Date(session.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
-                  <span className="text-sm font-black text-emerald-500 tabular-nums">₹{session.earnings} <span className="text-[10px] text-slate-400 font-medium tracking-normal ml-1">({session.score} correct)</span></span>
-                </div>
-                <button 
-                  onClick={() => deleteSession(session.id)}
-                  className="p-3 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-all"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            )) : (
-              <div className="p-12 text-center">
-                <p className="text-slate-400 text-xs italic">No history to manage.</p>
-              </div>
-            )}
+        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-100 dark:border-amber-800/30">
+          <div className="flex items-center gap-3">
+            <ShieldAlert size={18} className="text-amber-500" />
+            <p className="text-amber-700 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">Admin controls apply system-wide</p>
           </div>
         </div>
       </div>

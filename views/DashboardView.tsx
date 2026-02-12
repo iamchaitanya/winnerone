@@ -15,7 +15,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
 
   const ayaanTotal = ayaanAddition + ayaanNifty;
   const riyaanTotal = riyaanAddition + riyaanNifty;
-  const grandTotal = ayaanTotal + riyaanTotal;
+  const grandTotal = Math.abs(ayaanTotal) + Math.abs(riyaanTotal); // Use abs for better ratio visualization
 
   const isAyaanLeading = ayaanTotal >= riyaanTotal;
   const leader = isAyaanLeading ? { name: 'Ayaan', total: ayaanTotal, color: 'indigo' } : { name: 'Riyaan', total: riyaanTotal, color: 'rose' };
@@ -45,18 +45,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
             
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ayaan's Portfolio</h3>
             <div className="flex items-end gap-1 mb-6">
-              <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">₹{ayaanTotal.toLocaleString()}</span>
-              {ayaanTotal > 0 && <span className="text-[10px] font-bold text-emerald-500 mb-2 uppercase tracking-tighter">Profit</span>}
+              <span className={`text-3xl font-black tabular-nums ${ayaanTotal < 0 ? 'text-rose-500' : 'text-slate-900 dark:text-white'}`}>
+                ₹{ayaanTotal.toLocaleString()}
+              </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Addition</p>
-                <p className="text-sm font-black text-indigo-600 dark:text-indigo-400">₹{ayaanAddition}</p>
+                <p className={`text-sm font-black ${ayaanAddition < 0 ? 'text-rose-500' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                  ₹{ayaanAddition.toLocaleString()}
+                </p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50</p>
-                <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{ayaanNifty}</p>
+                <p className={`text-sm font-black ${ayaanNifty < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                  ₹{ayaanNifty.toLocaleString()}
+                </p>
               </div>
             </div>
           </div>
@@ -69,18 +74,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
             
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Riyaan's Portfolio</h3>
             <div className="flex items-end gap-1 mb-6">
-              <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">₹{riyaanTotal.toLocaleString()}</span>
-              {riyaanTotal > 0 && <span className="text-[10px] font-bold text-emerald-500 mb-2 uppercase tracking-tighter">Profit</span>}
+              <span className={`text-3xl font-black tabular-nums ${riyaanTotal < 0 ? 'text-rose-500' : 'text-slate-900 dark:text-white'}`}>
+                ₹{riyaanTotal.toLocaleString()}
+              </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Addition</p>
-                <p className="text-sm font-black text-rose-600 dark:text-rose-400">₹{riyaanAddition}</p>
+                <p className={`text-sm font-black ${riyaanAddition < 0 ? 'text-rose-500' : 'text-rose-600 dark:text-rose-400'}`}>
+                  ₹{riyaanAddition.toLocaleString()}
+                </p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50</p>
-                <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{riyaanNifty}</p>
+                <p className={`text-sm font-black ${riyaanNifty < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                  ₹{riyaanNifty.toLocaleString()}
+                </p>
               </div>
             </div>
           </div>
@@ -99,13 +109,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
               </div>
               <div>
                 <p className="text-4xl font-black tracking-tighter uppercase">{leader.name}</p>
-                <p className="text-sm font-bold opacity-80 italic">Leading by ₹{Math.abs(ayaanTotal - riyaanTotal).toLocaleString()}</p>
+                <p className={`text-sm font-bold opacity-80 italic ${leader.total < 0 ? 'text-rose-300' : ''}`}>
+                  Total Achievement: ₹{leader.total.toLocaleString()}
+                </p>
               </div>
             </div>
             <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden mt-6">
               <div 
                 className="h-full bg-white rounded-full transition-all duration-1000" 
-                style={{ width: `${Math.max(5, (leader.total / (grandTotal || 1)) * 100)}%` }}
+                style={{ width: `${Math.max(5, (Math.abs(leader.total) / (grandTotal || 1)) * 100)}%` }}
               />
             </div>
           </div>

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, Play, XCircle, MinusCircle, Crown, History, ChevronDown, ChevronRight, Calendar, Eye, AlertCircle, Clock } from 'lucide-react';
+import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, Play, XCircle, MinusCircle, Crown, History, ChevronDown, ChevronRight, Calendar, Eye, AlertCircle, Clock, CalendarX, Lock, Delete, ShieldAlert } from 'lucide-react';
+import { MARKET_HOLIDAYS_2025 } from '../types';
 
 interface AdditionViewProps {
   onBack: () => void;
@@ -8,6 +9,7 @@ interface AdditionViewProps {
 
 enum AdditionSubView {
   HUB = 'hub',
+  PIN_ENTRY = 'pin_entry',
   PRE_ENTRY = 'pre_entry',
   QUIZ = 'quiz',
   RESULTS = 'results',
@@ -51,11 +53,14 @@ interface DailyRecord {
 export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const [subView, setSubView] = useState<AdditionSubView>(AdditionSubView.HUB);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState(false);
   const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<'Ayaan' | 'Riyaan'>('Ayaan');
   
-  // Date Override (Read-only here, managed in AdminView)
+  // Settings
   const [dateOverride] = useState<string | null>(() => localStorage.getItem('addition_date_override'));
+  const isPinEntryEnabled = localStorage.getItem('pin_entry_enabled') !== 'false';
 
   // Ref for tracking question timing
   const lastQuestionTimeRef = useRef<number>(0);
@@ -72,12 +77,60 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const getEffectiveDate = useCallback(() => {
     if (dateOverride) {
       const d = new Date(dateOverride);
+      if (isNaN(d.getTime())) return new Date();
+
+      if (!dateOverride.includes('T')) {
+        const now = new Date();
+        const [y, m, day] = dateOverride.split('-').map(Number);
+        const localDate = new Date();
+        localDate.setFullYear(y, m - 1, day);
+        localDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+        return localDate;
+      }
+      
       const now = new Date();
-      d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+      d.setSeconds(now.getSeconds(), now.getMilliseconds());
       return d;
     }
     return new Date();
   }, [dateOverride]);
+
+  // Market Day Helpers
+  const isWeekend = useCallback((date: Date) => {
+    const day = date.getDay();
+    return day === 0 || day === 6; // Sunday or Saturday
+  }, []);
+
+  const isPublicHoliday = useCallback((date: Date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    return MARKET_HOLIDAYS_2025.includes(dateStr);
+  }, []);
+
+  const isMarketOpenDay = useCallback(() => {
+    const d = getEffectiveDate();
+    return !isWeekend(d) && !isPublicHoliday(d);
+  }, [getEffectiveDate, isWeekend, isPublicHoliday]);
+
+  // Lockout logic
+  const getUserAttempts = (user: string | null) => {
+    if (!user) return 0;
+    return Number(localStorage.getItem(`pin_attempts_${user.toLowerCase()}`) || '0');
+  };
+
+  const isUserLocked = (user: string | null) => {
+    return getUserAttempts(user) >= 3;
+  };
+
+  const incrementAttempts = (user: string) => {
+    const key = `pin_attempts_${user.toLowerCase()}`;
+    const attempts = Number(localStorage.getItem(key) || '0') + 1;
+    localStorage.setItem(key, attempts.toString());
+    return attempts;
+  };
+
+  const resetAttempts = (user: string) => {
+    localStorage.setItem(`pin_attempts_${user.toLowerCase()}`, '0');
+  };
 
   // Quiz State
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -88,9 +141,13 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const [timeLeft, setTimeLeft] = useState(100); 
   const [isActive, setIsActive] = useState(false);
   const [sessionResults, setSessionResults] = useState<QuestionResult[]>([]);
+  
+  // Track final state to avoid reading stale variables during transition
+  const [finalSessionEarnings, setFinalSessionEarnings] = useState(0);
+  const [finalScore, setFinalScore] = useState(0);
+  const [finalWrong, setFinalWrong] = useState(0);
 
-  const finishRef = useRef<() => void>(() => {});
-  const sessionEarnings = score - wrongCount;
+  const finishRef = useRef<(fS?: number, fW?: number, fR?: QuestionResult[]) => void>(() => {});
 
   const hasPlayedToday = useCallback((player: string | null) => {
     if (!player) return false;
@@ -114,10 +171,20 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     return newQuestions;
   }, []);
 
-  const finishQuiz = useCallback(() => {
+  const finishQuiz = useCallback((fScore?: number, fWrong?: number, fResults?: QuestionResult[]) => {
     setIsActive(false);
-    const earnings = score - wrongCount;
     
+    // Use passed values or current state (fallback for timer expiration)
+    const s = fScore !== undefined ? fScore : score;
+    const w = fWrong !== undefined ? fWrong : wrongCount;
+    const results = fResults !== undefined ? fResults : sessionResults;
+    const earnings = s - w;
+    
+    // Update display states for Results view
+    setFinalScore(s);
+    setFinalWrong(w);
+    setFinalSessionEarnings(earnings);
+
     if (selectedUser === 'Ayaan') {
       const newVal = ayaanTotal + earnings;
       setAyaanTotal(newVal);
@@ -133,11 +200,11 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     const newSession: GameSession = {
       id: Math.random().toString(36).substr(2, 9),
       player: selectedUser || 'Unknown',
-      score,
-      wrong: wrongCount,
+      score: s,
+      wrong: w,
       earnings,
       timestamp: effectiveTime,
-      results: sessionResults
+      results: results
     };
     const updatedHistory = [newSession, ...history].slice(0, 500);
     setHistory(updatedHistory);
@@ -150,6 +217,10 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   }, [finishQuiz]);
 
   const startQuiz = () => {
+    if (!isMarketOpenDay()) {
+      alert("Trading closed today! The game is only available Monday to Friday, excluding holidays.");
+      return;
+    }
     if (hasPlayedToday(selectedUser)) return;
     setQuestions(generateQuestions());
     setCurrentIndex(0);
@@ -193,27 +264,78 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     const timeTaken = (now - lastQuestionTimeRef.current) / 1000;
     lastQuestionTimeRef.current = now;
 
-    if (correct) setScore((s) => s + 1);
-    else setWrongCount((w) => w + 1);
+    const nextScore = correct ? score + 1 : score;
+    const nextWrong = correct ? wrongCount : wrongCount + 1;
+    
+    if (correct) setScore(nextScore);
+    else setWrongCount(nextWrong);
 
-    setSessionResults(prev => [...prev, {
+    const resultEntry = {
       ...questions[currentIndex],
       userAnswer: numericAns,
       isCorrect: correct,
       timeTaken
-    }]);
+    };
+    
+    const nextResults = [...sessionResults, resultEntry];
+    setSessionResults(nextResults);
 
     if (currentIndex < 99) {
       setTimeout(() => {
         setCurrentIndex((i) => i + 1);
         setUserInput('');
       }, 100);
-    } else finishQuiz();
+    } else {
+      // Pass the fully updated values to finishQuiz to avoid stale state
+      finishQuiz(nextScore, nextWrong, nextResults);
+    }
   };
 
   const handleUserSelect = (user: string) => {
     setSelectedUser(user);
-    setSubView(AdditionSubView.PRE_ENTRY);
+    if (isPinEntryEnabled) {
+      setPinInput('');
+      setPinError(false);
+      setSubView(AdditionSubView.PIN_ENTRY);
+    } else {
+      setSubView(AdditionSubView.PRE_ENTRY);
+    }
+  };
+
+  const handlePinKey = (num: string) => {
+    if (isUserLocked(selectedUser) || pinError) return;
+    if (pinInput.length < 6) {
+      const nextVal = pinInput + num;
+      setPinInput(nextVal);
+      if (nextVal.length === 6) {
+        verifyPin(nextVal);
+      }
+    }
+  };
+
+  const handlePinDelete = () => {
+    if (isUserLocked(selectedUser) || pinError) return;
+    setPinInput(pinInput.slice(0, -1));
+    setPinError(false);
+  };
+
+  const verifyPin = (pin: string) => {
+    const correctPin = selectedUser === 'Ayaan' 
+      ? (localStorage.getItem('pin_ayaan') || '123456') 
+      : (localStorage.getItem('pin_riyaan') || '654321');
+    
+    if (pin === correctPin) {
+      resetAttempts(selectedUser!);
+      setSubView(AdditionSubView.PRE_ENTRY);
+    } else {
+      setPinError(true);
+      incrementAttempts(selectedUser!);
+      // Delay clearing to allow shake animation to be seen
+      setTimeout(() => {
+        setPinInput('');
+        setPinError(false);
+      }, 600);
+    }
   };
 
   const groupedHistory = useMemo(() => {
@@ -270,6 +392,10 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   if (subView === AdditionSubView.HUB) {
     const ayaanPlayed = hasPlayedToday('Ayaan');
     const riyaanPlayed = hasPlayedToday('Riyaan');
+    const effectiveDate = getEffectiveDate();
+    const isMarketWorkingDay = isMarketOpenDay();
+    const isWknd = isWeekend(effectiveDate);
+    const isHoliday = isPublicHoliday(effectiveDate);
 
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 animate-in fade-in duration-500">
@@ -279,21 +405,50 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
               <ArrowLeft size={24} />
             </button>
             <div className="flex flex-col">
-              <h1 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">Addition Hub</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">Addition Hub</h1>
+                {!isMarketWorkingDay && (
+                  <span className="px-2 py-0.5 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase rounded-full tracking-wider border border-rose-200/50 dark:border-rose-800/50">
+                    Market Closed
+                  </span>
+                )}
+              </div>
               {dateOverride && <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider flex items-center gap-1"><Clock size={10} /> Override Active</span>}
             </div>
           </div>
         </header>
+        
+        {!isMarketWorkingDay && (
+          <div className="mb-8 max-w-md mx-auto">
+            <div className="p-5 rounded-[2rem] border bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-800/30 flex items-center gap-4 shadow-sm">
+              <div className="p-3 rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-500/20">
+                <CalendarX size={20} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-400">Market Status</p>
+                <p className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                  {isWknd ? 'Weekend Holiday' : isHoliday ? 'Public Holiday' : 'Session Closed'}
+                </p>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">Games are disabled during market closures.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <section className="flex flex-col gap-4 max-w-md mx-auto">
           <button 
             onClick={() => handleUserSelect('Ayaan')} 
             className="flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl transition-all group hover:border-indigo-400 active:scale-[0.98]"
           >
-            <div className="flex items-center gap-6">
-              <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl group-hover:scale-110 transition-transform"><User size={32} /></div>
+            <div className="flex items-center gap-6 w-full">
+              <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl group-hover:scale-110 transition-transform">
+                {isUserLocked('Ayaan') ? <Lock size={32} className="text-rose-500" /> : <User size={32} />}
+              </div>
               <div className="flex flex-col items-start text-left">
-                <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase leading-none">AYAAN</span>
-                {ayaanPlayed && <span className="text-[10px] font-bold text-emerald-500 uppercase mt-1 flex items-center gap-1"><Check size={10} /> Completed Today</span>}
+                <span className={`font-black text-2xl tracking-tighter uppercase leading-none ${isUserLocked('Ayaan') ? 'text-rose-500' : 'text-slate-900 dark:text-white'}`}>
+                  AYAAN {isUserLocked('Ayaan') && '(LOCKED)'}
+                </span>
+                {ayaanPlayed && !isUserLocked('Ayaan') && <span className="text-[10px] font-bold text-emerald-500 uppercase mt-1 flex items-center gap-1"><Check size={10} /> Completed Today</span>}
               </div>
             </div>
           </button>
@@ -301,11 +456,15 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
             onClick={() => handleUserSelect('Riyaan')} 
             className="flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl transition-all group hover:border-rose-400 active:scale-[0.98]"
           >
-            <div className="flex items-center gap-6">
-              <div className="p-4 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-2xl group-hover:scale-110 transition-transform"><Users size={32} /></div>
+            <div className="flex items-center gap-6 w-full">
+              <div className="p-4 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-2xl group-hover:scale-110 transition-transform">
+                {isUserLocked('Riyaan') ? <Lock size={32} className="text-rose-500" /> : <Users size={32} />}
+              </div>
               <div className="flex flex-col items-start text-left">
-                <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase leading-none">RIYAAN</span>
-                {riyaanPlayed && <span className="text-[10px] font-bold text-emerald-500 uppercase mt-1 flex items-center gap-1"><Check size={10} /> Completed Today</span>}
+                <span className={`font-black text-2xl tracking-tighter uppercase leading-none ${isUserLocked('Riyaan') ? 'text-rose-500' : 'text-slate-900 dark:text-white'}`}>
+                  RIYAAN {isUserLocked('Riyaan') && '(LOCKED)'}
+                </span>
+                {riyaanPlayed && !isUserLocked('Riyaan') && <span className="text-[10px] font-bold text-emerald-500 uppercase mt-1 flex items-center gap-1"><Check size={10} /> Completed Today</span>}
               </div>
             </div>
           </button>
@@ -322,6 +481,88 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
             </div>
           </button>
         </section>
+      </div>
+    );
+  }
+
+  if (subView === AdditionSubView.PIN_ENTRY) {
+    const locked = isUserLocked(selectedUser);
+    const attempts = getUserAttempts(selectedUser);
+    const attemptsLeft = Math.max(0, 3 - attempts);
+
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 animate-in slide-in-from-bottom duration-300">
+        <div className="mb-8 text-center">
+          <div className={`w-20 h-20 bg-white dark:bg-slate-900 rounded-3xl shadow-xl flex items-center justify-center mx-auto mb-6 border border-slate-100 dark:border-slate-800 ${locked ? 'ring-4 ring-rose-500/20' : ''}`}>
+            {locked ? <ShieldAlert size={32} className="text-rose-500 animate-pulse" /> : <Lock size={32} className="text-indigo-500" />}
+          </div>
+          <h2 className={`text-2xl font-black uppercase tracking-tighter ${locked ? 'text-rose-500' : 'text-slate-900 dark:text-white'}`}>
+            {locked ? 'Account Locked' : 'Enter PIN'}
+          </h2>
+          <p className="text-slate-400 text-sm font-bold uppercase tracking-widest mt-1">Hello, {selectedUser}</p>
+        </div>
+
+        {locked ? (
+          <div className="bg-rose-50 dark:bg-rose-900/20 p-6 rounded-3xl border border-rose-100 dark:border-rose-800/50 max-w-xs text-center mb-8">
+            <p className="text-rose-600 dark:text-rose-400 font-bold text-sm leading-relaxed">Too many wrong attempts. Please contact the administrator to unlock your account.</p>
+          </div>
+        ) : (
+          <>
+            <div className={`flex gap-3 mb-6 ${pinError ? 'animate-shake' : ''}`}>
+              {[...Array(6)].map((_, i) => (
+                <div 
+                  key={i} 
+                  className={`w-4 h-4 rounded-full transition-all duration-200 border-2 ${
+                    pinError ? 'bg-rose-500 border-rose-500 scale-110 shadow-[0_0_12px_rgba(244,63,94,0.4)]' : 
+                    i < pinInput.length ? 'bg-indigo-500 border-indigo-500 scale-110 shadow-[0_0_12px_rgba(99,102,241,0.3)]' : 'bg-transparent border-slate-200 dark:border-slate-800'
+                  }`}
+                />
+              ))}
+            </div>
+
+            <div className="h-10 mb-8 flex flex-col items-center justify-center">
+              {pinError ? (
+                <p className="text-rose-500 font-black text-xs uppercase tracking-[0.2em] animate-bounce">Incorrect PIN</p>
+              ) : (
+                attempts > 0 && (
+                  <p className={`text-[10px] font-black uppercase tracking-widest ${attemptsLeft === 1 ? 'text-rose-500 animate-pulse' : 'text-slate-400'}`}>
+                    {attemptsLeft} {attemptsLeft === 1 ? 'attempt' : 'attempts'} remaining
+                  </p>
+                )
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 w-full max-w-xs">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                <button 
+                  key={num} 
+                  disabled={pinError}
+                  onClick={() => handlePinKey(num.toString())}
+                  className="h-20 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-2xl font-black text-slate-900 dark:text-white active:scale-90 transition-transform disabled:opacity-50"
+                >
+                  {num}
+                </button>
+              ))}
+              <div />
+              <button 
+                disabled={pinError}
+                onClick={() => handlePinKey('0')}
+                className="h-20 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-2xl font-black text-slate-900 dark:text-white active:scale-90 transition-transform disabled:opacity-50"
+              >
+                0
+              </button>
+              <button 
+                disabled={pinError}
+                onClick={handlePinDelete}
+                className="h-20 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex items-center justify-center text-slate-400 active:scale-90 transition-transform disabled:opacity-50"
+              >
+                <Delete size={24} />
+              </button>
+            </div>
+          </>
+        )}
+
+        <button onClick={() => setSubView(AdditionSubView.HUB)} className="mt-12 text-slate-400 font-bold text-sm uppercase tracking-widest">Back</button>
       </div>
     );
   }
@@ -420,6 +661,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   if (subView === AdditionSubView.PRE_ENTRY) {
     const isPlayed = hasPlayedToday(selectedUser);
     const todaySession = getTodaySession(selectedUser);
+    const isMarketWorking = isMarketOpenDay();
 
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 animate-in zoom-in-95 duration-300 text-center">
@@ -438,6 +680,9 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
               onClick={() => {
                 if (todaySession?.results) {
                   setSessionResults(todaySession.results);
+                  setFinalScore(todaySession.score);
+                  setFinalWrong(todaySession.wrong);
+                  setFinalSessionEarnings(todaySession.earnings);
                   setSubView(AdditionSubView.REVIEW);
                 }
               }}
@@ -446,9 +691,15 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
               <Eye size={24} /> REVIEW RESULTS
             </button>
           </>
+        ) : !isMarketWorking ? (
+          <div className="bg-amber-50 dark:bg-amber-900/20 px-8 py-6 rounded-[2rem] border border-amber-100 dark:border-amber-800/50 mb-12 max-w-xs">
+            <CalendarX size={32} className="text-amber-500 mx-auto mb-3" />
+            <p className="text-amber-600 dark:text-amber-400 font-black text-sm uppercase tracking-wide">Market Closed</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase mt-2">Picks and games only allowed Monday-Friday, excluding holidays.</p>
+          </div>
         ) : (
           <>
-            <p className="text-slate-400 font-medium mb-12 uppercase tracking-widest text-xs">Ready for the 100-Question Challenge?</p>
+            <p className="text-slate-400 font-medium mb-12 uppercase tracking-widest text-xs">Ready for the 100-Second Challenge?</p>
             <button 
               onClick={startQuiz} 
               className="w-full max-w-xs h-20 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 transition-all hover:scale-105 active:scale-95 shadow-xl mx-auto block"
@@ -488,16 +739,16 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   }
 
   if (subView === AdditionSubView.RESULTS) {
-    const totalAttempted = score + wrongCount;
+    const totalAttempted = finalScore + finalWrong;
     const skippedCount = 100 - totalAttempted;
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 animate-in zoom-in-95 duration-500 text-center">
-        <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 transition-colors duration-500 ${sessionEarnings >= 0 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' : 'bg-rose-100 dark:bg-rose-900/30 text-rose-600'}`}><IndianRupee size={64} /></div>
+        <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 transition-colors duration-500 ${finalSessionEarnings >= 0 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' : 'bg-rose-100 dark:bg-rose-900/30 text-rose-600'}`}><IndianRupee size={64} /></div>
         <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Session Earnings</h2>
-        <div className={`text-6xl font-black mb-12 tabular-nums transition-colors duration-500 ${sessionEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>₹{sessionEarnings}</div>
+        <div className={`text-6xl font-black mb-12 tabular-nums transition-colors duration-500 ${finalSessionEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>₹{finalSessionEarnings}</div>
         <div className="grid grid-cols-3 gap-4 mb-6 w-full max-sm:px-4 max-w-sm mx-auto">
-          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-center"><Check size={20} className="mx-auto mb-1 text-emerald-500" /><p className="text-2xl font-black text-slate-900 dark:text-white">+{score}</p></div>
-          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-center"><XCircle size={20} className="mx-auto mb-1 text-rose-500" /><p className="text-2xl font-black text-rose-500">-{wrongCount}</p></div>
+          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-center"><Check size={20} className="mx-auto mb-1 text-emerald-500" /><p className="text-2xl font-black text-slate-900 dark:text-white">+{finalScore}</p></div>
+          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-center"><XCircle size={20} className="mx-auto mb-1 text-rose-500" /><p className="text-2xl font-black text-rose-500">-{finalWrong}</p></div>
           <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-center"><MinusCircle size={20} className="mx-auto mb-1 text-slate-400" /><p className="text-2xl font-black text-slate-400">{skippedCount}</p></div>
         </div>
         <button onClick={() => setSubView(AdditionSubView.REVIEW)} className="w-full max-sm:px-4 max-w-sm mb-3 h-16 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl font-black text-lg text-slate-900 dark:text-white shadow-md active:scale-95 transition-all mx-auto block">VIEW ANSWERS</button>
