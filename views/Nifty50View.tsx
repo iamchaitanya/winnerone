@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, History, ChevronDown, ChevronRight, Play, Eye, TrendingUp, TrendingDown, Crown, AlertCircle, Search, Trophy, Clock, XCircle, TrendingUpDown, Timer, Coffee, BarChart, CalendarX, Lock, Delete, ShieldAlert, Medal } from 'lucide-react';
-import { MARKET_HOLIDAYS_2025 } from '../types';
+import { isMarketHoliday } from '../src/lib/holidayManager';
 
 interface Nifty50ViewProps {
   onBack: () => void;
@@ -82,7 +82,7 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
 
   const isPublicHoliday = useCallback((date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
-    return MARKET_HOLIDAYS_2025.includes(dateStr);
+    return isMarketHoliday(dateStr);
   }, []);
 
   const isMarketOpenDay = useCallback(() => {

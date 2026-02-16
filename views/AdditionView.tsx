@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, Play, XCircle, MinusCircle, Crown, History, ChevronDown, ChevronRight, Eye, AlertCircle, Clock, CalendarX, Lock, Delete, ShieldAlert } from 'lucide-react';
-import { MARKET_HOLIDAYS_2025 } from '../types';
+import { isMarketHoliday } from '../src/lib/holidayManager';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 
@@ -145,7 +145,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
 
   const isPublicHoliday = useCallback((date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
-    return MARKET_HOLIDAYS_2025.includes(dateStr);
+    return isMarketHoliday(dateStr);
   }, []);
 
   const isMarketOpenDay = useCallback(() => {

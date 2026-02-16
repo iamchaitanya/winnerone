@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { HomeView } from './views/HomeView';
 import { AdditionView } from './views/AdditionView';
@@ -8,6 +7,7 @@ import { AdminView } from './views/AdminView';
 import { ViewType } from './types';
 
 import { supabase } from './src/lib/supabase';
+import { fetchAndCacheHolidays } from './src/lib/holidayManager'; // Added this import
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>(ViewType.HOME);
@@ -30,6 +30,11 @@ const App: React.FC = () => {
   }, [isDarkMode]);
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
+
+  // Initialize background tasks on boot
+  useEffect(() => {
+    fetchAndCacheHolidays();
+  }, []);
 
   const renderView = () => {
     switch (currentView) {
