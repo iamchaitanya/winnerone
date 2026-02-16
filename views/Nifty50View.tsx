@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, History, ChevronDown, ChevronRight, Play, Eye, TrendingUp, TrendingDown, Crown, AlertCircle, Search, Trophy, Clock, XCircle, TrendingUpDown, Timer, Coffee, BarChart, CalendarX, Lock, Delete, ShieldAlert, Medal } from 'lucide-react';
 import { isMarketHoliday } from '../src/lib/holidayManager';
+import { fetchStockReturn } from '../src/lib/stockFetcher';
 
 interface Nifty50ViewProps {
   onBack: () => void;
@@ -42,6 +42,7 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   const [pinError, setPinError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
+  const [isSettling, setIsSettling] = useState(false); // FIXED: Moved to top level
 
   // Settings
   const isPinEntryEnabled = localStorage.getItem('pin_entry_enabled') !== 'false';
@@ -143,21 +144,7 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     return niftyHistory.find(s => s.player === sibling && new Date(s.timestamp).toDateString() === today);
   }, [niftyHistory, getEffectiveDate]);
 
-  const getMarketReturnsForDay = useCallback((dateStr: string) => {
-    const seed = dateStr.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const seededRandom = (s: number) => {
-      const x = Math.sin(s) * 10000;
-      return x - Math.floor(x);
-    };
-
-    const returns: Record<string, number> = {};
-    NIFTY_50_SYMBOLS.forEach((sym, idx) => {
-      returns[sym] = (seededRandom(seed + idx) * 10 - 5);
-    });
-    return returns;
-  }, []);
-
-  const handleStockPick = (symbol: string) => {
+  const handleStockPick = async (symbol: string) => {
     if (!isMarketOpenDay()) {
       alert("Market is closed today (Weekend/Holiday).");
       return;
@@ -184,19 +171,24 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
       isSettled: false
     };
 
+    // Save locally first
     const newHistory = [mySession, ...niftyHistory].slice(0, 500);
     setNiftyHistory(newHistory);
     localStorage.setItem('nifty_history', JSON.stringify(newHistory));
     
+    // Now move to the results view
     setSubView(NiftySubView.RESULTS);
   };
 
-  const settleEarnings = useCallback((session: NiftySession) => {
+  const settleEarnings = useCallback(async (session: NiftySession) => {
     if (session.isSettled) return session;
     
     const dateStr = new Date(session.timestamp).toDateString();
-    const allReturns = getMarketReturnsForDay(dateStr);
-    const returnsValue = allReturns[session.symbol];
+    
+    // 1. Fetch real return from FMP API instead of simulated math
+    const returnsValue = await fetchStockReturn(session.symbol, dateStr);
+    
+    // 2. Calculate earnings (keeping your 10x multiplier logic)
     const earningsValue = Math.round(returnsValue * 10);
     
     const updatedSession = {
@@ -206,6 +198,7 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
       isSettled: true
     };
 
+    // 3. Update the totals in state and localStorage
     if (session.player === 'Ayaan') {
       const total = ayaanNiftyTotal + earningsValue;
       setAyaanNiftyTotal(total);
@@ -216,12 +209,13 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
       localStorage.setItem('riyaan_nifty_total', total.toString());
     }
 
+    // 4. Save the settled session to history
     const newHistory = niftyHistory.map(h => h.id === session.id ? updatedSession : h);
     setNiftyHistory(newHistory);
     localStorage.setItem('nifty_history', JSON.stringify(newHistory));
 
     return updatedSession;
-  }, [ayaanNiftyTotal, riyaanNiftyTotal, niftyHistory, getMarketReturnsForDay]);
+  }, [ayaanNiftyTotal, riyaanNiftyTotal, niftyHistory]);
 
   const filteredStocks = useMemo(() => {
     return NIFTY_50_SYMBOLS.filter(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -287,6 +281,24 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
       }, 600);
     }
   };
+
+  // FIXED: Moved the useEffect to the top level to follow React Rules of Hooks
+  useEffect(() => {
+    if (subView === NiftySubView.RESULTS) {
+      const mySession = getTodaySession(selectedUser);
+      const isReady = isAfterMarketClose();
+
+      const runSettle = async () => {
+        if (isReady && mySession && !mySession.isSettled && !isSettling) {
+          setIsSettling(true);
+          await settleEarnings(mySession);
+          setIsSettling(false);
+        }
+      };
+      runSettle();
+    }
+  }, [subView, selectedUser, getTodaySession, isAfterMarketClose, isSettling, settleEarnings]);
+
 
   if (subView === NiftySubView.HUB) {
     const ayaanPlayed = hasPlayedToday('Ayaan');
@@ -576,14 +588,21 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   }
 
   if (subView === NiftySubView.RESULTS) {
-    let mySession = getTodaySession(selectedUser);
+    const mySession = getTodaySession(selectedUser);
     const sibSession = getSiblingTodaySession(selectedUser);
     const isReady = isAfterMarketClose();
 
     if (!mySession) return null;
 
-    if (isReady && !mySession.isSettled) {
-      mySession = settleEarnings(mySession);
+    // Show a loading state while fetching real NSE prices
+    if (isSettling || (isReady && !mySession.isSettled)) {
+      return (
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+          <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Fetching NSE Data</h2>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-2">Connecting to Market via FMP...</p>
+        </div>
+      );
     }
 
     // Winner & Overall Performance Logic
