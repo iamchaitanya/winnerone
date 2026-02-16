@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowLeft, Check, IndianRupee, User, Users, BarChart2, History, ChevronDown, ChevronRight, Play, Eye, TrendingUp, TrendingDown, Crown, AlertCircle, Search, Trophy, Clock, XCircle, TrendingUpDown, Timer, Coffee, BarChart, CalendarX, Lock, Delete, ShieldAlert, Medal } from 'lucide-react';
+import { ArrowLeft, Check, IndianRupee, User, Users, History, ChevronDown, ChevronRight, Play, Eye, TrendingUp, TrendingDown, Crown, AlertCircle, Search, Trophy, Clock, XCircle, TrendingUpDown, Timer, Coffee, BarChart, CalendarX, Lock, Delete, ShieldAlert, Medal } from 'lucide-react';
 import { isMarketHoliday } from '../src/lib/holidayManager';
-import { fetchStockReturn } from '../src/lib/stockFetcher';
+import { fetchStockReturn, fetchAllNiftyReturns } from '../src/lib/stockFetcher';
 
 interface Nifty50ViewProps {
   onBack: () => void;
@@ -42,7 +42,10 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   const [pinError, setPinError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
-  const [isSettling, setIsSettling] = useState(false); // FIXED: Moved to top level
+  const [isSettling, setIsSettling] = useState(false);
+
+  // 1. State to hold our live market data
+  const [liveStockData, setLiveStockData] = useState<Record<string, { price: number; changesPercentage: number }>>({});
 
   // Settings
   const isPinEntryEnabled = localStorage.getItem('pin_entry_enabled') !== 'false';
@@ -282,7 +285,18 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     }
   };
 
-  // FIXED: Moved the useEffect to the top level to follow React Rules of Hooks
+  // 2. Trigger the batch fetch ONLY when they open the stock picker
+  // Placed safely below the isMarketOpenDay dependency
+  useEffect(() => {
+    if (subView === NiftySubView.STOCK_PICK && isMarketOpenDay()) {
+      const loadLivePrices = async () => {
+        const data = await fetchAllNiftyReturns(NIFTY_50_SYMBOLS);
+        setLiveStockData(data);
+      };
+      loadLivePrices();
+    }
+  }, [subView, isMarketOpenDay]);
+
   useEffect(() => {
     if (subView === NiftySubView.RESULTS) {
       const mySession = getTodaySession(selectedUser);
@@ -562,6 +576,8 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto pb-12">
           {filteredStocks.map(stock => {
             const isTaken = stock === siblingPick;
+            const liveData = liveStockData[stock];
+
             return (
               <button 
                 key={stock} 
@@ -574,7 +590,11 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
                 }`}
               >
                 <span className={`text-sm font-black ${isTaken ? 'text-slate-400' : 'text-slate-900 dark:text-white'}`}>{stock}</span>
-                {isTaken ? (
+                {liveData ? (
+                  <div className={`text-[10px] font-bold mt-1 flex items-center gap-1 ${liveData.changesPercentage >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    ₹{liveData.price.toFixed(2)} ({liveData.changesPercentage > 0 ? '+' : ''}{liveData.changesPercentage.toFixed(2)}%)
+                  </div>
+                ) : isTaken ? (
                   <span className="text-[8px] font-black text-rose-500 uppercase mt-1 tracking-tighter">Sibling Picked</span>
                 ) : (
                   <span className="text-[10px] text-slate-400 uppercase tracking-tighter mt-1">Nifty 50</span>

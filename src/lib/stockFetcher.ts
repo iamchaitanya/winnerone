@@ -43,3 +43,39 @@ export async function fetchStockReturn(symbol: string, dateStr: string): Promise
     return 0; 
   }
 }
+
+export async function fetchAllNiftyReturns(symbols: string[]): Promise<Record<string, { price: number; changesPercentage: number }>> {
+    try {
+      // 1. Format all symbols for NSE and join them with commas for a batch request
+      const nseSymbols = symbols.map(s => `${s}.NS`).join(',');
+      
+      // 2. Call the FMP Quote API with the batch of symbols
+      const response = await fetch(`https://financialmodelingprep.com/api/v3/quote/${nseSymbols}?apikey=${FMP_API_KEY}`);
+      
+      if (!response.ok) {
+        throw new Error('Batch network response was not ok');
+      }
+  
+      const data = await response.json();
+      
+      // 3. Transform the array response into an easy-to-use dictionary mapped by our local symbol names
+      const stockDataMap: Record<string, { price: number; changesPercentage: number }> = {};
+      
+      if (data && data.length > 0) {
+        data.forEach((stock: any) => {
+          // Remove the '.NS' suffix to exactly match our NIFTY_50_SYMBOLS array
+          const cleanSymbol = stock.symbol.replace('.NS', '');
+          stockDataMap[cleanSymbol] = {
+            price: stock.price,
+            changesPercentage: stock.changesPercentage
+          };
+        });
+      }
+      
+      return stockDataMap;
+    } catch (error) {
+      console.error('Error fetching batch stock data:', error);
+      // Safe fallback to an empty object if offline or API fails, preventing crashes
+      return {}; 
+    }
+  }
