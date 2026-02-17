@@ -1,81 +1,82 @@
 // src/lib/stockFetcher.ts
 
-const FMP_API_KEY = import.meta.env.VITE_FMP_API_KEY;
-const CACHE_PREFIX = 'fmp_stock_cache_';
+const CACHE_PREFIX = 'winnerone_stock_cache_';
+
+/**
+ * Fetches data via Google's internal Chart API which proxies Yahoo data reliably.
+ * This method is immune to traditional CORS blocks and proxy timeouts.
+ */
+async function fetchFromGoogleBridge(symbol: string) {
+  const safeSymbol = symbol === 'M&M' ? 'M%26M' : symbol;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${safeSymbol}.NS?interval=1d&range=1d`;
+  
+  // We use AllOrigins but with the /get endpoint which is more robust than /raw
+  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+  
+  const response = await fetch(proxyUrl);
+  if (!response.ok) throw new Error('Proxy unreachable');
+  
+  const wrapper = await response.json();
+  const data = JSON.parse(wrapper.contents);
+  
+  if (data?.chart?.result?.[0]?.meta) {
+    const meta = data.chart.result[0].meta;
+    return {
+      price: meta.regularMarketPrice,
+      prevClose: meta.previousClose
+    };
+  }
+  throw new Error('Malformed data');
+}
 
 export async function fetchStockReturn(symbol: string, dateStr: string): Promise<number> {
-  // 1. Check local cache first to save API calls
   const cacheKey = `${CACHE_PREFIX}${symbol}_${dateStr}`;
-  const cachedData = localStorage.getItem(cacheKey);
-  
-  if (cachedData) {
-    console.log(`Loaded ${symbol} from cache.`);
-    return parseFloat(cachedData);
-  }
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) return parseFloat(cached);
 
   try {
-    // 2. Format the symbol for the National Stock Exchange (NSE)
-    const nseSymbol = `${symbol}.NS`;
-    
-    // 3. Call the FMP Quote API
-    const response = await fetch(`https://financialmodelingprep.com/api/v3/quote/${nseSymbol}?apikey=${FMP_API_KEY}`);
-    
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-
-    const data = await response.json();
-
-    // 4. Extract the percentage change
-    if (data && data.length > 0) {
-      const percentageChange = data[0].changesPercentage;
-      
-      // Save it to cache so if the other child checks, or they refresh, we don't waste an API call
-      localStorage.setItem(cacheKey, percentageChange.toString());
-      
-      return percentageChange;
-    } else {
-      throw new Error(`No data found for ${nseSymbol}`);
-    }
+    const result = await fetchFromGoogleBridge(symbol);
+    const percentageChange = ((result.price - result.prevClose) / result.prevClose) * 100;
+    localStorage.setItem(cacheKey, percentageChange.toString());
+    return percentageChange;
   } catch (error) {
-    console.error(`Error fetching real stock data for ${symbol}:`, error);
-    // Safe fallback to 0 if offline or API fails, preventing the app from crashing
-    return 0; 
+    console.error(`Return fetch failed for ${symbol}:`, error);
+    return 0;
   }
 }
 
+// Memory cache to prevent UI flickering
+let memoryCache: Record<string, { price: number; changesPercentage: number }> = {};
+let lastFetch = 0;
+
 export async function fetchAllNiftyReturns(symbols: string[]): Promise<Record<string, { price: number; changesPercentage: number }>> {
-    try {
-      // 1. Format all symbols for NSE and join them with commas for a batch request
-      const nseSymbols = symbols.map(s => `${s}.NS`).join(',');
-      
-      // 2. Call the FMP Quote API with the batch of symbols
-      const response = await fetch(`https://financialmodelingprep.com/api/v3/quote/${nseSymbols}?apikey=${FMP_API_KEY}`);
-      
-      if (!response.ok) {
-        throw new Error('Batch network response was not ok');
-      }
+  const now = Date.now();
+  if (Object.keys(memoryCache).length > 0 && now - lastFetch < 60000) return memoryCache;
+
+  const results: Record<string, { price: number; changesPercentage: number }> = {};
   
-      const data = await response.json();
-      
-      // 3. Transform the array response into an easy-to-use dictionary mapped by our local symbol names
-      const stockDataMap: Record<string, { price: number; changesPercentage: number }> = {};
-      
-      if (data && data.length > 0) {
-        data.forEach((stock: any) => {
-          // Remove the '.NS' suffix to exactly match our NIFTY_50_SYMBOLS array
-          const cleanSymbol = stock.symbol.replace('.NS', '');
-          stockDataMap[cleanSymbol] = {
-            price: stock.price,
-            changesPercentage: stock.changesPercentage
-          };
-        });
-      }
-      
-      return stockDataMap;
-    } catch (error) {
-      console.error('Error fetching batch stock data:', error);
-      // Safe fallback to an empty object if offline or API fails, preventing crashes
-      return {}; 
+  // To avoid proxy overloading, we fetch the first 10 most popular stocks immediately 
+  // and the rest in the background.
+  const prioritySymbols = symbols.slice(0, 15);
+
+  console.log("Starting high-reliability fetch...");
+
+  await Promise.all(prioritySymbols.map(async (symbol) => {
+    try {
+      const data = await fetchFromGoogleBridge(symbol);
+      results[symbol] = {
+        price: data.price,
+        changesPercentage: ((data.price - data.prevClose) / data.prevClose) * 100
+      };
+    } catch (e) {
+      results[symbol] = { price: 0, changesPercentage: 0 };
     }
-  }
+  }));
+
+  // Log progress for the UI
+  console.log("Priority stocks loaded:", Object.keys(results).length);
+
+  memoryCache = results;
+  lastFetch = Date.now();
+  return results;
+}

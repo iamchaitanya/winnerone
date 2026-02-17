@@ -297,21 +297,18 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     }
   }, [subView, isMarketOpenDay]);
 
-  useEffect(() => {
-    if (subView === NiftySubView.RESULTS) {
-      const mySession = getTodaySession(selectedUser);
-      const isReady = isAfterMarketClose();
-
-      const runSettle = async () => {
-        if (isReady && mySession && !mySession.isSettled && !isSettling) {
-          setIsSettling(true);
-          await settleEarnings(mySession);
-          setIsSettling(false);
-        }
-      };
-      runSettle();
-    }
-  }, [subView, selectedUser, getTodaySession, isAfterMarketClose, isSettling, settleEarnings]);
+// Diagnostic Fetch Trigger
+useEffect(() => {
+  if (subView === NiftySubView.STOCK_PICK) {
+    console.log("Attempting to fetch Nifty 50 prices...");
+    const loadLivePrices = async () => {
+      const data = await fetchAllNiftyReturns(NIFTY_50_SYMBOLS);
+      console.log("Live Market Data Loaded:", data);
+      setLiveStockData(data);
+    };
+    loadLivePrices();
+  }
+}, [subView]);
 
 
   if (subView === NiftySubView.HUB) {
