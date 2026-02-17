@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Check, IndianRupee, User, Users, History, ChevronDown, ChevronRight, Play, Eye, TrendingUp, TrendingDown, Crown, AlertCircle, Search, Trophy, Clock, XCircle, TrendingUpDown, Timer, Coffee, BarChart, CalendarX, Lock, Delete, ShieldAlert, Medal } from 'lucide-react';
 import { isMarketHoliday } from '../src/lib/holidayManager';
 import { fetchStockReturn, fetchAllNiftyReturns } from '../src/lib/stockFetcher';
+import { NIFTY_50_SYMBOLS } from '../src/lib/constants';
 
 interface Nifty50ViewProps {
   onBack: () => void;
@@ -27,13 +28,6 @@ interface NiftySession {
   isSettled?: boolean;
 }
 
-const NIFTY_50_SYMBOLS = [
-  'ADANIENT', 'ADANIPORTS', 'APOLLOHOSP', 'ASIANPAINT', 'AXISBANK', 'BAJAJ-AUTO', 'BAJFINANCE', 'BAJAJFINSV', 'BPCL', 'BHARTIARTL',
-  'BRITANNIA', 'CIPLA', 'COALINDIA', 'DIVISLAB', 'DRREDDY', 'EICHERMOT', 'GRASIM', 'HCLTECH', 'HDFCBANK', 'HDFCLIFE',
-  'HEROMOTOCO', 'HINDALCO', 'HINDUNILVR', 'ICICIBANK', 'ITC', 'INDUSINDBK', 'INFY', 'JSWSTEEL', 'KOTAKBANK', 'LT',
-  'M&M', 'MARUTI', 'NTPC', 'NESTLEIND', 'ONGC', 'POWERGRID', 'RELIANCE', 'SBILIFE', 'SBIN', 'SUNPHARMA',
-  'TCS', 'TATACONSUM', 'TATAMOTORS', 'TATASTEEL', 'TECHM', 'TITAN', 'UPL', 'ULTRACEMCO', 'WIPRO'
-];
 
 export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   const [subView, setSubView] = useState<NiftySubView>(NiftySubView.HUB);

@@ -1,32 +1,44 @@
 // src/lib/stockFetcher.ts
 
 const CACHE_PREFIX = 'winnerone_stock_cache_';
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR3tiV98fFdm8rYUTaPT7Ey3IfrPwc4Mh-x1u9gV0vc0h3QClvYkqhI_OxEG-e0L5VPSeKVZX0wnfey/pub?output=csv';
+
+// Memory cache to prevent UI flickering
+let memoryCache: Record<string, { price: number; changesPercentage: number }> = {};
+let lastFetch = 0;
 
 /**
- * Fetches data via Google's internal Chart API which proxies Yahoo data reliably.
- * This method is immune to traditional CORS blocks and proxy timeouts.
+ * Fetches data directly from the published Google Sheet CSV.
  */
-async function fetchFromGoogleBridge(symbol: string) {
-  const safeSymbol = symbol === 'M&M' ? 'M%26M' : symbol;
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${safeSymbol}.NS?interval=1d&range=1d`;
-  
-  // We use AllOrigins but with the /get endpoint which is more robust than /raw
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-  
-  const response = await fetch(proxyUrl);
-  if (!response.ok) throw new Error('Proxy unreachable');
-  
-  const wrapper = await response.json();
-  const data = JSON.parse(wrapper.contents);
-  
-  if (data?.chart?.result?.[0]?.meta) {
-    const meta = data.chart.result[0].meta;
-    return {
-      price: meta.regularMarketPrice,
-      prevClose: meta.previousClose
-    };
+async function fetchFromGoogleSheet(): Promise<Record<string, { price: number; changesPercentage: number }>> {
+  try {
+    const response = await fetch(CSV_URL);
+    if (!response.ok) throw new Error('Failed to fetch CSV');
+    
+    const csvText = await response.text();
+    const lines = csvText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    
+    const results: Record<string, { price: number; changesPercentage: number }> = {};
+    
+    // Skip the header row (index 0)
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',');
+      if (cols.length >= 3) {
+        const symbol = cols[0].trim();
+        const price = parseFloat(cols[1].trim());
+        const changesPercentage = parseFloat(cols[2].trim());
+        
+        if (symbol && !isNaN(price) && !isNaN(changesPercentage)) {
+          results[symbol] = { price, changesPercentage };
+        }
+      }
+    }
+    
+    return results;
+  } catch (error) {
+    console.error('Error fetching from Google Sheets:', error);
+    return {};
   }
-  throw new Error('Malformed data');
 }
 
 export async function fetchStockReturn(symbol: string, dateStr: string): Promise<number> {
@@ -35,46 +47,42 @@ export async function fetchStockReturn(symbol: string, dateStr: string): Promise
   if (cached) return parseFloat(cached);
 
   try {
-    const result = await fetchFromGoogleBridge(symbol);
-    const percentageChange = ((result.price - result.prevClose) / result.prevClose) * 100;
-    localStorage.setItem(cacheKey, percentageChange.toString());
-    return percentageChange;
+    const data = await fetchFromGoogleSheet();
+    const stockData = data[symbol];
+    
+    if (stockData) {
+      const percentageChange = stockData.changesPercentage;
+      localStorage.setItem(cacheKey, percentageChange.toString());
+      return percentageChange;
+    }
+    return 0;
   } catch (error) {
     console.error(`Return fetch failed for ${symbol}:`, error);
     return 0;
   }
 }
 
-// Memory cache to prevent UI flickering
-let memoryCache: Record<string, { price: number; changesPercentage: number }> = {};
-let lastFetch = 0;
-
 export async function fetchAllNiftyReturns(symbols: string[]): Promise<Record<string, { price: number; changesPercentage: number }>> {
   const now = Date.now();
-  if (Object.keys(memoryCache).length > 0 && now - lastFetch < 60000) return memoryCache;
+  if (Object.keys(memoryCache).length > 0 && now - lastFetch < 60000) {
+    return memoryCache;
+  }
 
+  console.log("Starting fetch from Google Sheets CSV...");
+  const data = await fetchFromGoogleSheet();
+  
   const results: Record<string, { price: number; changesPercentage: number }> = {};
   
-  // To avoid proxy overloading, we fetch the first 10 most popular stocks immediately 
-  // and the rest in the background.
-  const prioritySymbols = symbols.slice(0, 15);
-
-  console.log("Starting high-reliability fetch...");
-
-  await Promise.all(prioritySymbols.map(async (symbol) => {
-    try {
-      const data = await fetchFromGoogleBridge(symbol);
-      results[symbol] = {
-        price: data.price,
-        changesPercentage: ((data.price - data.prevClose) / data.prevClose) * 100
-      };
-    } catch (e) {
+  // Only map the symbols the UI actually requested
+  symbols.forEach(symbol => {
+    if (data[symbol]) {
+      results[symbol] = data[symbol];
+    } else {
       results[symbol] = { price: 0, changesPercentage: 0 };
     }
-  }));
+  });
 
-  // Log progress for the UI
-  console.log("Priority stocks loaded:", Object.keys(results).length);
+  console.log("Stocks loaded from Sheet:", Object.keys(results).length);
 
   memoryCache = results;
   lastFetch = Date.now();
