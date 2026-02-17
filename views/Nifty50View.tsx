@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Check, IndianRupee, User, Users, History, ChevronDown, ChevronRight, Play, Eye, TrendingUp, TrendingDown, Crown, AlertCircle, Search, Trophy, Clock, XCircle, TrendingUpDown, Timer, Coffee, BarChart, CalendarX, Lock, Delete, ShieldAlert, Medal } from 'lucide-react';
 import { isMarketHoliday } from '../src/lib/holidayManager';
-import { fetchStockReturn, fetchAllNiftyReturns } from '../src/lib/stockFetcher';
+import { fetchAllLiveReturns, fetchStockReturn } from '../src/lib/stockFetcher';
 import { NIFTY_50_SYMBOLS } from '../src/lib/constants';
+import { supabase } from '../src/lib/supabase';
 
 interface Nifty50ViewProps {
   onBack: () => void;
@@ -158,31 +159,55 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
       return;
     }
 
-    const mySession: NiftySession = {
-      id: Math.random().toString(36).substr(2, 9),
-      player: selectedUser!,
-      symbol,
-      stockReturn: 0,
-      earnings: 0,
-      timestamp: getEffectiveDate().getTime(),
-      isSettled: false
-    };
+    const todayDateString = getEffectiveDate().toISOString().split('T')[0];
 
-    // Save locally first
-    const newHistory = [mySession, ...niftyHistory].slice(0, 500);
-    setNiftyHistory(newHistory);
-    localStorage.setItem('nifty_history', JSON.stringify(newHistory));
-    
-    // Now move to the results view
-    setSubView(NiftySubView.RESULTS);
+    try {
+      // 1. Save to Supabase so both frontend and backend can see it at 5:00 PM
+      const { error } = await supabase
+        .from('nifty_logs')
+        .insert([
+          {
+            date: todayDateString,
+            player: selectedUser!,
+            stock_symbol: symbol
+          }
+        ]);
+
+      if (error) {
+        console.error("Supabase insert error:", error);
+        alert("Could not connect to the database. Pick not saved.");
+        return; 
+      }
+
+      // 2. Keep your original local storage logic intact
+      const mySession: NiftySession = {
+        id: Math.random().toString(36).substr(2, 9),
+        player: selectedUser!,
+        symbol,
+        stockReturn: 0,
+        earnings: 0,
+        timestamp: getEffectiveDate().getTime(),
+        isSettled: false
+      };
+
+      const newHistory = [mySession, ...niftyHistory].slice(0, 500);
+      setNiftyHistory(newHistory);
+      localStorage.setItem('nifty_history', JSON.stringify(newHistory));
+      
+      setSubView(NiftySubView.RESULTS);
+      
+    } catch (err) {
+      console.error('Error saving pick:', err);
+      alert('Failed to save your pick to the server. Please check your connection.');
+    }
   };
-
   const settleEarnings = useCallback(async (session: NiftySession) => {
     if (session.isSettled) return session;
     
     const dateStr = new Date(session.timestamp).toDateString();
+    const dbDateStr = new Date(session.timestamp).toISOString().split('T')[0];
     
-    // 1. Fetch real return from FMP API instead of simulated math
+    // 1. Fetch real return from your CSV
     const returnsValue = await fetchStockReturn(session.symbol, dateStr);
     
     // 2. Calculate earnings (keeping your 10x multiplier logic)
@@ -195,7 +220,18 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
       isSettled: true
     };
 
-    // 3. Update the totals in state and localStorage
+    // 3. Save the final calculated results to Supabase!
+    try {
+      await supabase
+        .from('nifty_logs')
+        .update({ stock_return: returnsValue, earnings: earningsValue })
+        .eq('date', dbDateStr)
+        .eq('player', session.player);
+    } catch (err) {
+      console.error("Failed to update Supabase earnings", err);
+    }
+
+    // 4. Update the totals in state and localStorage
     if (session.player === 'Ayaan') {
       const total = ayaanNiftyTotal + earningsValue;
       setAyaanNiftyTotal(total);
@@ -206,7 +242,7 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
       localStorage.setItem('riyaan_nifty_total', total.toString());
     }
 
-    // 4. Save the settled session to history
+    // 5. Save the settled session to history
     const newHistory = niftyHistory.map(h => h.id === session.id ? updatedSession : h);
     setNiftyHistory(newHistory);
     localStorage.setItem('nifty_history', JSON.stringify(newHistory));
@@ -279,30 +315,116 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     }
   };
 
-  // 2. Trigger the batch fetch ONLY when they open the stock picker
-  // Placed safely below the isMarketOpenDay dependency
-  useEffect(() => {
-    if (subView === NiftySubView.STOCK_PICK && isMarketOpenDay()) {
-      const loadLivePrices = async () => {
-        const data = await fetchAllNiftyReturns(NIFTY_50_SYMBOLS);
-        setLiveStockData(data);
-      };
-      loadLivePrices();
-    }
-  }, [subView, isMarketOpenDay]);
 
-// Diagnostic Fetch Trigger
+// 3. Sync today's picks from Supabase in case the sibling played on a different device
 useEffect(() => {
+  const syncTodayPicks = async () => {
+    const todayStr = getEffectiveDate().toISOString().split('T')[0];
+    
+    try {
+      const { data, error } = await supabase
+        .from('nifty_logs')
+        .select('*')
+        .eq('date', todayStr);
+
+      if (error || !data) return;
+
+      setNiftyHistory(prevHistory => {
+        let updated = [...prevHistory];
+        let changed = false;
+        
+        data.forEach(dbPick => {
+          // Check if we already have this pick locally
+          const exists = updated.some(
+            h => h.player === dbPick.player && new Date(h.timestamp).toDateString() === getEffectiveDate().toDateString()
+          );
+          
+          if (!exists) {
+            updated.unshift({
+              id: dbPick.id || Math.random().toString(36).substr(2, 9),
+              player: dbPick.player,
+              symbol: dbPick.stock_symbol,
+              stockReturn: dbPick.stock_return || 0,
+              earnings: dbPick.earnings || 0,
+              timestamp: new Date(dbPick.created_at || Date.now()).getTime(),
+              isSettled: dbPick.stock_return !== null
+            });
+            changed = true;
+          }
+        });
+
+        if (changed) {
+          localStorage.setItem('nifty_history', JSON.stringify(updated));
+          return updated;
+        }
+        return prevHistory;
+      });
+    } catch (err) {
+      console.error("Failed to sync cloud picks:", err);
+    }
+  };
+
+  if (isMarketOpenDay()) {
+    syncTodayPicks();
+  }
+}, [isMarketOpenDay, getEffectiveDate]);
+
+
+// 4. The 5:00 PM Auto-Settlement Trigger
+useEffect(() => {
+  const checkAndSettle = async () => {
+    // Don't run on weekends or holidays
+    if (!isMarketOpenDay()) return;
+    
+    const now = getEffectiveDate();
+    
+    // Only trigger if it is 5:00 PM (17:00) or later
+    if (now.getHours() >= 17) {
+      const todayStr = now.toDateString();
+      
+      // Find ANY unsettled sessions for today (for either Ayaan or Riyaan)
+      const unsettledSessions = niftyHistory.filter(
+        session => new Date(session.timestamp).toDateString() === todayStr && !session.isSettled
+      );
+
+      // Settle them one by one
+      for (const session of unsettledSessions) {
+        console.log(`Auto-settling ${session.player}'s pick for today...`);
+        await settleEarnings(session);
+      }
+    }
+  };
+
+  // Run the check immediately when the component loads
+  checkAndSettle();
+  
+  // Also set up a silent timer to check the clock every 1 minute while the app is open
+  const interval = setInterval(checkAndSettle, 60000);
+  return () => clearInterval(interval);
+  
+}, [isMarketOpenDay, getEffectiveDate, niftyHistory, settleEarnings]);
+
+// 1. FOR THE PICKING SCREEN: Fetch Live Returns
+useEffect(() => {
+  // Only fetch if the kids are on the Stock Pick screen
   if (subView === NiftySubView.STOCK_PICK) {
-    console.log("Attempting to fetch Nifty 50 prices...");
     const loadLivePrices = async () => {
-      const data = await fetchAllNiftyReturns(NIFTY_50_SYMBOLS);
-      console.log("Live Market Data Loaded:", data);
-      setLiveStockData(data);
+      console.log("Fetching Nifty 50 prices for the picking screen...");
+      
+      // We call our new 'Bulk Fetcher' from the stockFetcher file
+      const data = await fetchAllLiveReturns(); 
+      
+      if (data && Object.keys(data).length > 0) {
+        console.log("Market Data Loaded Successfully:", data);
+        setLiveStockData(data); // This fills the list Ayaan and Riyaan see
+      } else {
+        console.error("Market Data fetch returned empty results.");
+      }
     };
+
     loadLivePrices();
   }
-}, [subView]);
+}, [subView]); // Only re-run when they switch to the picking screen
 
 
   if (subView === NiftySubView.HUB) {
@@ -581,9 +703,12 @@ useEffect(() => {
                 }`}
               >
                 <span className={`text-sm font-black ${isTaken ? 'text-slate-400' : 'text-slate-900 dark:text-white'}`}>{stock}</span>
-                {liveData ? (
-                  <div className={`text-[10px] font-bold mt-1 flex items-center gap-1 ${liveData.changesPercentage >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    ₹{liveData.price.toFixed(2)} ({liveData.changesPercentage > 0 ? '+' : ''}{liveData.changesPercentage.toFixed(2)}%)
+                
+                {/* Use the new object structure safely */}
+                {liveStockData && liveStockData[stock] ? (
+                  <div className={`text-[10px] font-bold mt-1 flex items-center gap-1 ${liveStockData[stock].changesPercentage >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    ₹{(liveStockData[stock].price || 0).toFixed(2)} 
+                    ({liveStockData[stock].changesPercentage > 0 ? '+' : ''}{(liveStockData[stock].changesPercentage || 0).toFixed(2)}%)
                   </div>
                 ) : isTaken ? (
                   <span className="text-[8px] font-black text-rose-500 uppercase mt-1 tracking-tighter">Sibling Picked</span>

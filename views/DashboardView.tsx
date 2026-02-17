@@ -14,48 +14,57 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
   const [ayaanAddition, setAyaanAddition] = useState(0);
   const [riyaanAddition, setRiyaanAddition] = useState(0);
 
-  // State for Local Data (Nifty Game - Not synced yet)
-  const [ayaanNifty] = useState(() => Number(localStorage.getItem('ayaan_nifty_total') || '0'));
-  const [riyaanNifty] = useState(() => Number(localStorage.getItem('riyaan_nifty_total') || '0'));
+  
+ // 1. Remove the old localStorage states and replace with these:
+ const [ayaanNifty, setAyaanNifty] = useState(0);
+ const [riyaanNifty, setRiyaanNifty] = useState(0);
 
   // FETCH DATA FROM CLOUD
   useEffect(() => {
     fetchScores();
   }, []);
 
-  const fetchScores = async () => {
-    setLoading(true);
-    
-    // 1. Get all addition logs from Supabase
-    const { data, error } = await supabase
+ // 2. Update the fetchScores function:
+ const fetchScores = async () => {
+  setLoading(true);
+  
+  try {
+    // Fetch Addition logs
+    const { data: addData } = await supabase
       .from('addition_logs')
       .select('player_id, earnings');
 
-    if (error) {
-      console.error('Error fetching scores:', error);
-      setLoading(false);
-      return;
-    }
+    // Fetch Nifty 50 logs
+    const { data: niftyData } = await supabase
+      .from('nifty_logs')
+      .select('player, earnings');
 
-    // 2. Calculate Totals
-    let ayaanSum = 0;
-    let riyaanSum = 0;
+    let addAyaan = 0, addRiyaan = 0;
+    let niftyAyaan = 0, niftyRiyaan = 0;
 
-    if (data) {
-      data.forEach((log: any) => {
-        if (log.player_id === PLAYER_IDS.Ayaan) {
-          ayaanSum += log.earnings;
-        } else if (log.player_id === PLAYER_IDS.Riyaan) {
-          riyaanSum += log.earnings;
-        }
-      });
-    }
+    // Sum Addition
+    addData?.forEach((log: any) => {
+      if (log.player_id === PLAYER_IDS.Ayaan) addAyaan += log.earnings;
+      else if (log.player_id === PLAYER_IDS.Riyaan) addRiyaan += log.earnings;
+    });
 
-    // 3. Update State
-    setAyaanAddition(ayaanSum);
-    setRiyaanAddition(riyaanSum);
+    // Sum Nifty
+    niftyData?.forEach((log: any) => {
+      // Use 'player' column based on our table structure
+      if (log.player === 'Ayaan') niftyAyaan += log.earnings || 0;
+      else if (log.player === 'Riyaan') niftyRiyaan += log.earnings || 0;
+    });
+
+    setAyaanAddition(addAyaan);
+    setRiyaanAddition(addRiyaan);
+    setAyaanNifty(niftyAyaan);
+    setRiyaanNifty(niftyRiyaan);
+  } catch (error) {
+    console.error('Error fetching dashboard scores:', error);
+  } finally {
     setLoading(false);
-  };
+  }
+};
 
   const ayaanTotal = ayaanAddition + ayaanNifty;
   const riyaanTotal = riyaanAddition + riyaanNifty;
@@ -110,8 +119,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                   {loading ? '...' : `₹${ayaanAddition.toLocaleString()}`}
                 </p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 opacity-60">
-                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50 (Local)</p>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50 (Cloud)</p>
                 <p className={`text-sm font-black ${ayaanNifty < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   ₹{ayaanNifty.toLocaleString()}
                 </p>
@@ -139,8 +148,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                   {loading ? '...' : `₹${riyaanAddition.toLocaleString()}`}
                 </p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 opacity-60">
-                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50 (Local)</p>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50 (Cloud)</p>
                 <p className={`text-sm font-black ${riyaanNifty < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   ₹{riyaanNifty.toLocaleString()}
                 </p>
