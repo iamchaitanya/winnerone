@@ -29,7 +29,6 @@ interface NiftySession {
   isSettled?: boolean;
 }
 
-
 export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   const [subView, setSubView] = useState<NiftySubView>(NiftySubView.HUB);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
@@ -47,12 +46,22 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   const dateOverride = localStorage.getItem('addition_date_override');
 
   // Persistent State
-  const [ayaanNiftyTotal, setAyaanNiftyTotal] = useState<number>(() => Number(localStorage.getItem('ayaan_nifty_total') || '0'));
-  const [riyaanNiftyTotal, setRiyaanNiftyTotal] = useState<number>(() => Number(localStorage.getItem('riyaan_nifty_total') || '0'));
   const [niftyHistory, setNiftyHistory] = useState<NiftySession[]>(() => {
     const saved = localStorage.getItem('nifty_history');
     return saved ? JSON.parse(saved) : [];
   });
+
+  const ayaanNiftyTotal = useMemo(() => {
+    return niftyHistory
+      .filter(session => session.player === 'Ayaan' && session.isSettled)
+      .reduce((total, session) => total + (session.earnings || 0), 0);
+  }, [niftyHistory]);
+
+  const riyaanNiftyTotal = useMemo(() => {
+    return niftyHistory
+      .filter(session => session.player === 'Riyaan' && session.isSettled)
+      .reduce((total, session) => total + (session.earnings || 0), 0);
+  }, [niftyHistory]);
 
   const getEffectiveDate = useCallback(() => {
     const now = new Date();
@@ -162,7 +171,6 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     const todayDateString = getEffectiveDate().toISOString().split('T')[0];
 
     try {
-      // 1. Save to Supabase so both frontend and backend can see it at 5:00 PM
       const { error } = await supabase
         .from('nifty_logs')
         .insert([
@@ -179,7 +187,6 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
         return; 
       }
 
-      // 2. Keep your original local storage logic intact
       const mySession: NiftySession = {
         id: Math.random().toString(36).substr(2, 9),
         player: selectedUser!,
@@ -201,54 +208,6 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
       alert('Failed to save your pick to the server. Please check your connection.');
     }
   };
-  const settleEarnings = useCallback(async (session: NiftySession) => {
-    if (session.isSettled) return session;
-    
-    const dateStr = new Date(session.timestamp).toDateString();
-    const dbDateStr = new Date(session.timestamp).toISOString().split('T')[0];
-    
-    // 1. Fetch real return from your CSV
-    const returnsValue = await fetchStockReturn(session.symbol, dateStr);
-    
-    // 2. Calculate earnings (keeping your 10x multiplier logic)
-    const earningsValue = Math.round(returnsValue * 10);
-    
-    const updatedSession = {
-      ...session,
-      stockReturn: returnsValue,
-      earnings: earningsValue,
-      isSettled: true
-    };
-
-    // 3. Save the final calculated results to Supabase!
-    try {
-      await supabase
-        .from('nifty_logs')
-        .update({ stock_return: returnsValue, earnings: earningsValue })
-        .eq('date', dbDateStr)
-        .eq('player', session.player);
-    } catch (err) {
-      console.error("Failed to update Supabase earnings", err);
-    }
-
-    // 4. Update the totals in state and localStorage
-    if (session.player === 'Ayaan') {
-      const total = ayaanNiftyTotal + earningsValue;
-      setAyaanNiftyTotal(total);
-      localStorage.setItem('ayaan_nifty_total', total.toString());
-    } else {
-      const total = riyaanNiftyTotal + earningsValue;
-      setRiyaanNiftyTotal(total);
-      localStorage.setItem('riyaan_nifty_total', total.toString());
-    }
-
-    // 5. Save the settled session to history
-    const newHistory = niftyHistory.map(h => h.id === session.id ? updatedSession : h);
-    setNiftyHistory(newHistory);
-    localStorage.setItem('nifty_history', JSON.stringify(newHistory));
-
-    return updatedSession;
-  }, [ayaanNiftyTotal, riyaanNiftyTotal, niftyHistory]);
 
   const filteredStocks = useMemo(() => {
     return NIFTY_50_SYMBOLS.filter(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -315,116 +274,56 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     }
   };
 
+  // 3. NEW: Full Cloud Sync 
+  useEffect(() => {
+    const syncCloudHistory = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('nifty_logs')
+          .select('*')
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false });
 
-// 3. Sync today's picks from Supabase in case the sibling played on a different device
-useEffect(() => {
-  const syncTodayPicks = async () => {
-    const todayStr = getEffectiveDate().toISOString().split('T')[0];
-    
-    try {
-      const { data, error } = await supabase
-        .from('nifty_logs')
-        .select('*')
-        .eq('date', todayStr);
+        if (error || !data) return;
 
-      if (error || !data) return;
+        const updatedHistory: NiftySession[] = data.map(dbPick => ({
+          id: dbPick.id || Math.random().toString(36).substr(2, 9),
+          player: dbPick.player,
+          symbol: dbPick.stock_symbol,
+          stockReturn: dbPick.stock_return || 0,
+          earnings: dbPick.earnings || 0,
+          timestamp: new Date(dbPick.created_at || `${dbPick.date}T09:00:00`).getTime(),
+          isSettled: dbPick.stock_return !== null
+        }));
 
-      setNiftyHistory(prevHistory => {
-        let updated = [...prevHistory];
-        let changed = false;
-        
-        data.forEach(dbPick => {
-          // Check if we already have this pick locally
-          const exists = updated.some(
-            h => h.player === dbPick.player && new Date(h.timestamp).toDateString() === getEffectiveDate().toDateString()
-          );
-          
-          if (!exists) {
-            updated.unshift({
-              id: dbPick.id || Math.random().toString(36).substr(2, 9),
-              player: dbPick.player,
-              symbol: dbPick.stock_symbol,
-              stockReturn: dbPick.stock_return || 0,
-              earnings: dbPick.earnings || 0,
-              timestamp: new Date(dbPick.created_at || Date.now()).getTime(),
-              isSettled: dbPick.stock_return !== null
-            });
-            changed = true;
-          }
-        });
-
-        if (changed) {
-          localStorage.setItem('nifty_history', JSON.stringify(updated));
-          return updated;
-        }
-        return prevHistory;
-      });
-    } catch (err) {
-      console.error("Failed to sync cloud picks:", err);
-    }
-  };
-
-  if (isMarketOpenDay()) {
-    syncTodayPicks();
-  }
-}, [isMarketOpenDay, getEffectiveDate]);
-
-
-// 4. The 5:00 PM Auto-Settlement Trigger
-useEffect(() => {
-  const checkAndSettle = async () => {
-    // Don't run on weekends or holidays
-    if (!isMarketOpenDay()) return;
-    
-    const now = getEffectiveDate();
-    
-    // Only trigger if it is 5:00 PM (17:00) or later
-    if (now.getHours() >= 17) {
-      const todayStr = now.toDateString();
-      
-      // Find ANY unsettled sessions for today (for either Ayaan or Riyaan)
-      const unsettledSessions = niftyHistory.filter(
-        session => new Date(session.timestamp).toDateString() === todayStr && !session.isSettled
-      );
-
-      // Settle them one by one
-      for (const session of unsettledSessions) {
-        console.log(`Auto-settling ${session.player}'s pick for today...`);
-        await settleEarnings(session);
-      }
-    }
-  };
-
-  // Run the check immediately when the component loads
-  checkAndSettle();
-  
-  // Also set up a silent timer to check the clock every 1 minute while the app is open
-  const interval = setInterval(checkAndSettle, 60000);
-  return () => clearInterval(interval);
-  
-}, [isMarketOpenDay, getEffectiveDate, niftyHistory, settleEarnings]);
-
-// 1. FOR THE PICKING SCREEN: Fetch Live Returns
-useEffect(() => {
-  // Only fetch if the kids are on the Stock Pick screen
-  if (subView === NiftySubView.STOCK_PICK) {
-    const loadLivePrices = async () => {
-      console.log("Fetching Nifty 50 prices for the picking screen...");
-      
-      // We call our new 'Bulk Fetcher' from the stockFetcher file
-      const data = await fetchAllLiveReturns(); 
-      
-      if (data && Object.keys(data).length > 0) {
-        console.log("Market Data Loaded Successfully:", data);
-        setLiveStockData(data); // This fills the list Ayaan and Riyaan see
-      } else {
-        console.error("Market Data fetch returned empty results.");
+        setNiftyHistory(updatedHistory);
+        localStorage.setItem('nifty_history', JSON.stringify(updatedHistory));
+      } catch (err) {
+        console.error("Failed to sync cloud picks:", err);
       }
     };
 
-    loadLivePrices();
-  }
-}, [subView]); // Only re-run when they switch to the picking screen
+    syncCloudHistory();
+    
+    // Background polling every 30 seconds to catch sibling's picks or edge function settlements live
+    const interval = setInterval(syncCloudHistory, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 1. FOR THE PICKING SCREEN: Fetch Live Returns
+  useEffect(() => {
+    if (subView === NiftySubView.STOCK_PICK) {
+      const loadLivePrices = async () => {
+        const data = await fetchAllLiveReturns(); 
+        if (data && Object.keys(data).length > 0) {
+          setLiveStockData(data); 
+        } else {
+          console.error("Market Data fetch returned empty results.");
+        }
+      };
+      loadLivePrices();
+    }
+  }, [subView]); 
 
 
   if (subView === NiftySubView.HUB) {
