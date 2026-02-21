@@ -37,6 +37,10 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
   const [isSettling, setIsSettling] = useState(false);
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  // NEW: State to track if live data failed
+  const [liveDataError, setLiveDataError] = useState(false);
 
   // 1. State to hold our live market data
   const [liveStockData, setLiveStockData] = useState<Record<string, { price: number; changesPercentage: number }>>({});
@@ -152,6 +156,8 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   }, [niftyHistory, getEffectiveDate]);
 
   const handleStockPick = async (symbol: string) => {
+    if (isSubmitting) return; 
+    
     if (!isMarketOpenDay()) {
       alert("Market is closed today (Weekend/Holiday).");
       return;
@@ -167,6 +173,8 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
       alert(`${siblingSession.player} already picked ${symbol}! Pick another stock.`);
       return;
     }
+
+    setIsSubmitting(true); 
 
     const todayDateString = getEffectiveDate().toISOString().split('T')[0];
 
@@ -184,6 +192,7 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
       if (error) {
         console.error("Supabase insert error:", error);
         alert("Could not connect to the database. Pick not saved.");
+        setIsSubmitting(false); 
         return; 
       }
 
@@ -206,6 +215,8 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     } catch (err) {
       console.error('Error saving pick:', err);
       alert('Failed to save your pick to the server. Please check your connection.');
+    } finally {
+      setIsSubmitting(false); 
     }
   };
 
@@ -274,7 +285,7 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     }
   };
 
-  // 3. NEW: Full Cloud Sync 
+  // 3. Full Cloud Sync 
   useEffect(() => {
     const syncCloudHistory = async () => {
       try {
@@ -305,20 +316,27 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
 
     syncCloudHistory();
     
-    // Background polling every 30 seconds to catch sibling's picks or edge function settlements live
+    // Background polling every 30 seconds
     const interval = setInterval(syncCloudHistory, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // 1. FOR THE PICKING SCREEN: Fetch Live Returns
+  // 1. FOR THE PICKING SCREEN: Fetch Live Returns with Error Handling
   useEffect(() => {
     if (subView === NiftySubView.STOCK_PICK) {
       const loadLivePrices = async () => {
-        const data = await fetchAllLiveReturns(); 
-        if (data && Object.keys(data).length > 0) {
-          setLiveStockData(data); 
-        } else {
-          console.error("Market Data fetch returned empty results.");
+        setLiveDataError(false);
+        try {
+          const data = await fetchAllLiveReturns(); 
+          if (data && Object.keys(data).length > 0) {
+            setLiveStockData(data); 
+          } else {
+            console.error("Market Data fetch returned empty results.");
+            setLiveDataError(true);
+          }
+        } catch (e) {
+          console.error("Failed to fetch market data:", e);
+          setLiveDataError(true);
         }
       };
       loadLivePrices();
@@ -572,19 +590,33 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   if (subView === NiftySubView.STOCK_PICK) {
     return (
       <div className="min-h-screen bg-white dark:bg-slate-950 flex flex-col p-6 animate-in slide-in-from-bottom duration-300">
-        <header className="flex items-center gap-4 mb-8">
-          <button onClick={() => setSubView(NiftySubView.PLAYER_SELECT)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white"><ArrowLeft size={24} /></button>
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Search Stocks..." 
-              className="w-full h-12 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl pl-12 pr-4 font-bold text-slate-900 dark:text-white focus:ring-2 ring-indigo-500 outline-none"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+        <header className="flex flex-col gap-4 mb-4">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setSubView(NiftySubView.PLAYER_SELECT)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white"><ArrowLeft size={24} /></button>
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input 
+                type="text" 
+                placeholder="Search Stocks..." 
+                className="w-full h-12 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl pl-12 pr-4 font-bold text-slate-900 dark:text-white focus:ring-2 ring-indigo-500 outline-none"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
         </header>
+        
+        {/* NEW: Warning Banner for Empty Live Data */}
+        {liveDataError && (
+          <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 rounded-2xl border border-amber-100 dark:border-amber-800/50 flex items-start gap-3">
+            <AlertCircle size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-wide">Live Prices Unavailable</p>
+              <p className="text-[10px] font-medium text-amber-500/80 uppercase mt-0.5">Connection issues. You can still make your pick.</p>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto pb-12">
           {filteredStocks.map(stock => {
             const isTaken = stock === siblingPick;
@@ -593,11 +625,13 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
             return (
               <button 
                 key={stock} 
-                disabled={isTaken}
+                disabled={isTaken || isSubmitting}
                 onClick={() => handleStockPick(stock)}
                 className={`h-24 border rounded-2xl flex flex-col items-center justify-center shadow-sm transition-all group ${
                   isTaken 
                   ? 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 opacity-40 cursor-not-allowed' 
+                  : isSubmitting
+                  ? 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 opacity-70 cursor-wait'
                   : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-400 active:scale-95'
                 }`}
               >
