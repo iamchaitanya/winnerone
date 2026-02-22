@@ -47,16 +47,53 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
     }
   }, [isAuthenticated]);
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  // 1.5 Real-time Profile Listener
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const channel = supabase
+      .channel('admin-profile-updates')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles' },
+        (payload) => {
+          const updatedProfile = payload.new as any;
+          if (updatedProfile) {
+            setProfiles(prev => prev.map(p => 
+              p.id === updatedProfile.id ? { ...p, ...updatedProfile } : p
+            ));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated]);
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPassword === 'admin') {
+    
+    // Fetch the secure PIN from Supabase
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'admin_pin')
+      .single();
+
+    if (error || !data) {
+      setAdminError('System Error: admin_pin not configured in database');
+      return;
+    }
+
+    if (adminPassword === data.value) {
       setIsAuthenticated(true);
       setAdminError('');
     } else {
-      setAdminError('Incorrect password');
+      setAdminError('Incorrect PIN');
     }
   };
-
   // 2. Updated Toggle functions to save to 'app_settings' table
   const updateSetting = async (key: string, value: any) => {
     await supabase.from('app_settings').upsert({ key, value });

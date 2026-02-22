@@ -19,7 +19,7 @@ const App: React.FC = () => {
     return false;
   });
 
-  // App Settings from Supabase
+  // App Settings state
   const [appSettings, setAppSettings] = useState<any>({
     dateOverride: null,
     additionEnabled: true,
@@ -27,25 +27,67 @@ const App: React.FC = () => {
   });
   const [isSyncing, setIsSyncing] = useState(true);
 
-  // 1. Fetch Global Settings on Boot
-  useEffect(() => {
-    const syncSettings = async () => {
-      const { data } = await supabase.from('app_settings').select('*');
-      if (data) {
-        const map = data.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
-        setAppSettings({
-          dateOverride: map['addition_date_override'] || null,
-          additionEnabled: map['game_enabled_addition'] !== false,
-          niftyEnabled: map['game_enabled_nifty'] !== false
-        });
-      }
+ // 1. Fetch Global Settings and Listen for Real-Time Changes
+ useEffect(() => {
+  let isMounted = true;
+  let channel: any;
+
+  const syncSettings = async () => {
+    console.log("DEBUG: Fetching initial settings...");
+    const { data } = await supabase.from('app_settings').select('*');
+    if (data && isMounted) {
+      const map = data.reduce((acc: any, curr: any) => ({ ...acc, [curr.key]: curr.value }), {});
+      setAppSettings({
+        dateOverride: map['addition_date_override'] || null,
+        additionEnabled: map['game_enabled_addition'] !== false,
+        niftyEnabled: map['game_enabled_nifty'] !== false
+      });
       setIsSyncing(false);
-    };
+    }
+  };
 
-    syncSettings();
-    fetchAndCacheHolidays();
-  }, []);
+  syncSettings();
+  fetchAndCacheHolidays();
 
+  // Small delay to prevent React Strict Mode from killing the connection
+  const timer = setTimeout(() => {
+    if (!isMounted) return;
+
+    console.log("DEBUG: Attempting to connect to Realtime...");
+    channel = supabase
+      .channel('app_settings_live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_settings' },
+        (payload) => {
+          console.log("DEBUG: Realtime Payload Received!", payload);
+          const updatedRow = payload.new as any;
+          if (updatedRow && updatedRow.key) {
+            setAppSettings((prev: any) => ({
+              ...prev,
+              dateOverride: updatedRow.key === 'addition_date_override' ? updatedRow.value : prev.dateOverride,
+              additionEnabled: updatedRow.key === 'game_enabled_addition' ? (updatedRow.value !== false) : prev.additionEnabled,
+              niftyEnabled: updatedRow.key === 'game_enabled_nifty' ? (updatedRow.value !== false) : prev.niftyEnabled,
+            }));
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log("DEBUG: Realtime Status:", status);
+      });
+  }, 100);
+
+  return () => {
+    isMounted = false;
+    clearTimeout(timer);
+    if (channel) {
+      console.log("DEBUG: Cleaning up channel...");
+      supabase.removeChannel(channel);
+    }
+  };
+}, []);
+
+  // Theme Management
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
