@@ -4,73 +4,28 @@ import { supabase } from '../src/lib/supabase';
 
 interface AdminViewProps {
   onBack: () => void;
+  settings: {
+    dateOverride: string | null;
+    additionEnabled: boolean;
+    niftyEnabled: boolean;
+    pinEntryEnabled: boolean;
+  };
+  profiles: any[];
+  onUpdateSetting: (key: string, value: any) => Promise<void>;
 }
 
-export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
+export const AdminView: React.FC<AdminViewProps> = ({ onBack, settings, profiles, onUpdateSetting }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [adminError, setAdminError] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
   const [isResetting, setIsResetting] = useState(false);
 
-  // App settings state
-  const [dateOverride, setDateOverride] = useState<string | null>(null);
-  const [isAdditionEnabled, setIsAdditionEnabled] = useState(true);
-  const [isNiftyEnabled, setIsNiftyEnabled] = useState(true);
-  const [isPinEntryEnabled, setIsPinEntryEnabled] = useState(true);
-  
-  // User profiles state
-  const [profiles, setProfiles] = useState<any[]>([]);
+  // Local state for smooth typing, synced with global profiles
+  const [localProfiles, setLocalProfiles] = useState<any[]>([]);
 
-  // 1. Fetch all settings and profiles from Supabase on load
   useEffect(() => {
-    if (isAuthenticated) {
-      const fetchData = async () => {
-        setIsLoading(true);
-        
-        // Fetch App Settings
-        const { data: settings } = await supabase.from('app_settings').select('*');
-        const settingsMap = (settings || []).reduce((acc: any, curr: any) => ({ ...acc, [curr.key]: curr.value }), {});
-
-        setDateOverride(settingsMap['addition_date_override'] || null);
-        setIsAdditionEnabled(settingsMap['game_enabled_addition'] !== false);
-        setIsNiftyEnabled(settingsMap['game_enabled_nifty'] !== false);
-        setIsPinEntryEnabled(settingsMap['pin_entry_enabled'] !== false);
-
-        // Fetch User Profiles
-        const { data: userProfiles } = await supabase.from('profiles').select('*');
-        setProfiles(userProfiles || []);
-        
-        setIsLoading(false);
-      };
-      fetchData();
-    }
-  }, [isAuthenticated]);
-
-  // 1.5 Real-time Profile Listener
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const channel = supabase
-      .channel('admin-profile-updates')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'profiles' },
-        (payload) => {
-          const updatedProfile = payload.new as any;
-          if (updatedProfile) {
-            setProfiles(prev => prev.map(p => 
-              p.id === updatedProfile.id ? { ...p, ...updatedProfile } : p
-            ));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isAuthenticated]);
+    setLocalProfiles(profiles);
+  }, [profiles]);
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,49 +49,38 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
       setAdminError('Incorrect PIN');
     }
   };
-  // 2. Updated Toggle functions to save to 'app_settings' table
-  const updateSetting = async (key: string, value: any) => {
-    await supabase.from('app_settings').upsert({ key, value });
-  };
 
+  // 2. Updated Toggle functions using lifted state
   const toggleAddition = () => {
-    const newVal = !isAdditionEnabled;
-    setIsAdditionEnabled(newVal);
-    updateSetting('game_enabled_addition', newVal);
+    onUpdateSetting('game_enabled_addition', !settings.additionEnabled);
   };
 
   const toggleNifty = () => {
-    const newVal = !isNiftyEnabled;
-    setIsNiftyEnabled(newVal);
-    updateSetting('game_enabled_nifty', newVal);
+    onUpdateSetting('game_enabled_nifty', !settings.niftyEnabled);
   };
 
   const togglePinEntry = () => {
-    const newVal = !isPinEntryEnabled;
-    setIsPinEntryEnabled(newVal);
-    updateSetting('pin_entry_enabled', newVal);
+    onUpdateSetting('pin_entry_enabled', !settings.pinEntryEnabled);
   };
 
   const updateDateOverride = (val: string) => {
-    setDateOverride(val);
-    updateSetting('addition_date_override', val);
+    onUpdateSetting('addition_date_override', val);
   };
 
   const clearDateOverride = () => {
-    setDateOverride(null);
-    updateSetting('addition_date_override', null);
+    onUpdateSetting('addition_date_override', null);
   };
 
   // 3. Updated PIN and lock management to use 'profiles' table
   const updatePin = async (id: string, val: string) => {
     if (val.length <= 6 && /^\d*$/.test(val)) {
-      setProfiles(prev => prev.map(p => p.id === id ? { ...p, pin: val } : p));
+      setLocalProfiles(prev => prev.map(p => p.id === id ? { ...p, pin: val } : p));
       await supabase.from('profiles').update({ pin: val }).eq('id', id);
     }
   };
 
   const resetUserLock = async (id: string) => {
-    setProfiles(prev => prev.map(p => p.id === id ? { ...p, pin_attempts: 0, is_locked: false } : p));
+    setLocalProfiles(prev => prev.map(p => p.id === id ? { ...p, pin_attempts: 0, is_locked: false } : p));
     await supabase.from('profiles').update({ pin_attempts: 0, is_locked: false }).eq('id', id);
   };
 
@@ -181,8 +125,6 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
     );
   }
 
-  if (isLoading) return <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center font-black uppercase tracking-widest text-slate-400">Syncing with Supabase...</div>;
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 animate-in slide-in-from-right duration-300">
       <header className="flex items-center justify-between mb-8">
@@ -208,12 +150,12 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
                 <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Require User PIN</span>
               </div>
               <button onClick={togglePinEntry}>
-                {isPinEntryEnabled ? <ToggleRight size={32} className="text-indigo-600" /> : <ToggleLeft size={32} className="text-slate-300" />}
+                {settings.pinEntryEnabled ? <ToggleRight size={32} className="text-indigo-600" /> : <ToggleLeft size={32} className="text-slate-300" />}
               </button>
             </div>
 
             <div className="space-y-8 pt-4 border-t border-slate-50 dark:border-slate-800">
-              {profiles.map(profile => (
+              {localProfiles.map(profile => (
                 <div key={profile.id} className="space-y-4">
                   <div className="flex flex-col gap-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{profile.player_name} PIN</label>
@@ -257,13 +199,13 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
             <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
               <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Addition Game</span>
               <button onClick={toggleAddition}>
-                {isAdditionEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+                {settings.additionEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
               </button>
             </div>
             <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
               <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Nifty 50 Game</span>
               <button onClick={toggleNifty}>
-                {isNiftyEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+                {settings.niftyEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
               </button>
             </div>
           </div>
@@ -280,11 +222,11 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
               <input 
                 type="datetime-local" 
                 className="w-full h-14 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 px-4 font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none transition-all"
-                value={dateOverride || ''}
+                value={settings.dateOverride || ''}
                 onChange={(e) => updateDateOverride(e.target.value)}
               />
             </div>
-            {dateOverride && (
+            {settings.dateOverride && (
               <button 
                 onClick={clearDateOverride}
                 className="w-full h-14 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2"
