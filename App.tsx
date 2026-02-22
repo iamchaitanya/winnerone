@@ -7,7 +7,7 @@ import { AdminView } from './views/AdminView';
 import { ViewType } from './types';
 
 import { supabase } from './src/lib/supabase';
-import { fetchAndCacheHolidays } from './src/lib/holidayManager'; // Added this import
+import { fetchAndCacheHolidays } from './src/lib/holidayManager';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>(ViewType.HOME);
@@ -18,6 +18,33 @@ const App: React.FC = () => {
     }
     return false;
   });
+
+  // App Settings from Supabase
+  const [appSettings, setAppSettings] = useState<any>({
+    dateOverride: null,
+    additionEnabled: true,
+    niftyEnabled: true
+  });
+  const [isSyncing, setIsSyncing] = useState(true);
+
+  // 1. Fetch Global Settings on Boot
+  useEffect(() => {
+    const syncSettings = async () => {
+      const { data } = await supabase.from('app_settings').select('*');
+      if (data) {
+        const map = data.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
+        setAppSettings({
+          dateOverride: map['addition_date_override'] || null,
+          additionEnabled: map['game_enabled_addition'] !== false,
+          niftyEnabled: map['game_enabled_nifty'] !== false
+        });
+      }
+      setIsSyncing(false);
+    };
+
+    syncSettings();
+    fetchAndCacheHolidays();
+  }, []);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -31,39 +58,39 @@ const App: React.FC = () => {
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
-  // Initialize background tasks on boot
-  useEffect(() => {
-    fetchAndCacheHolidays();
-  }, []);
+  if (isSyncing) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="animate-pulse font-black text-slate-400 uppercase tracking-widest">
+          Loading WinnerOne...
+        </div>
+      </div>
+    );
+  }
 
   const renderView = () => {
     switch (currentView) {
       case ViewType.HOME:
-        return <HomeView onNavigate={setCurrentView} isDarkMode={isDarkMode} onToggleDark={toggleDarkMode} />;
+        return (
+          <HomeView 
+            onNavigate={setCurrentView} 
+            isDarkMode={isDarkMode} 
+            onToggleDark={toggleDarkMode}
+            settings={appSettings} 
+          />
+        );
       case ViewType.ADDITION:
-        return <AdditionView onBack={() => setCurrentView(ViewType.HOME)} />;
+        return <AdditionView onBack={() => setCurrentView(ViewType.HOME)} settings={appSettings} />;
       case ViewType.NIFTY50:
-        return <Nifty50View onBack={() => setCurrentView(ViewType.HOME)} />;
+        return <Nifty50View onBack={() => setCurrentView(ViewType.HOME)} settings={appSettings} />;
       case ViewType.DASHBOARD:
         return <DashboardView onBack={() => setCurrentView(ViewType.HOME)} />;
       case ViewType.ADMIN:
         return <AdminView onBack={() => setCurrentView(ViewType.HOME)} />;
       default:
-        return <HomeView onNavigate={setCurrentView} isDarkMode={isDarkMode} onToggleDark={toggleDarkMode} />;
+        return <HomeView onNavigate={setCurrentView} isDarkMode={isDarkMode} onToggleDark={toggleDarkMode} settings={appSettings} />;
     }
   };
-
-
-  useEffect(() => {
-    // Test connection to Supabase
-    supabase.from('addition_logs').select('count', { count: 'exact', head: true })
-      .then(({ count, error }) => {
-        if (error) console.error('Supabase Connection Error:', error);
-        else console.log('✅ Connected to Supabase! Row count:', count);
-      });
-  }, []);
-
-
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Settings, Calendar, RotateCcw, ToggleLeft, ToggleRight, Gamepad2, Clock, Lock, UserCheck, Trash2, AlertTriangle, Fingerprint, ShieldAlert } from 'lucide-react';
-import { supabase } from '../src/lib/supabase'; // Import the Cloud Connection
+import { supabase } from '../src/lib/supabase'; 
 
 interface AdminViewProps {
   onBack: () => void;
@@ -10,19 +10,42 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [adminError, setAdminError] = useState('');
-  const [isResetting, setIsResetting] = useState(false); // New loading state
+  const [isLoading, setIsLoading] = useState(true);
+  const [isResetting, setIsResetting] = useState(false);
 
   // App settings state
-  const [dateOverride, setDateOverride] = useState<string | null>(() => localStorage.getItem('addition_date_override'));
-  const [isAdditionEnabled, setIsAdditionEnabled] = useState(() => localStorage.getItem('game_enabled_addition') !== 'false');
-  const [isNiftyEnabled, setIsNiftyEnabled] = useState(() => localStorage.getItem('game_enabled_nifty') !== 'false');
-  const [isPinEntryEnabled, setIsPinEntryEnabled] = useState(() => localStorage.getItem('pin_entry_enabled') !== 'false');
+  const [dateOverride, setDateOverride] = useState<string | null>(null);
+  const [isAdditionEnabled, setIsAdditionEnabled] = useState(true);
+  const [isNiftyEnabled, setIsNiftyEnabled] = useState(true);
+  const [isPinEntryEnabled, setIsPinEntryEnabled] = useState(true);
   
-  // User PINs & Attempts
-  const [ayaanPin, setAyaanPin] = useState(() => localStorage.getItem('pin_ayaan') || '123456');
-  const [riyaanPin, setRiyaanPin] = useState(() => localStorage.getItem('pin_riyaan') || '654321');
-  const [ayaanAttempts, setAyaanAttempts] = useState(() => Number(localStorage.getItem('pin_attempts_ayaan') || '0'));
-  const [riyaanAttempts, setRiyaanAttempts] = useState(() => Number(localStorage.getItem('pin_attempts_riyaan') || '0'));
+  // User profiles state
+  const [profiles, setProfiles] = useState<any[]>([]);
+
+  // 1. Fetch all settings and profiles from Supabase on load
+  useEffect(() => {
+    if (isAuthenticated) {
+      const fetchData = async () => {
+        setIsLoading(true);
+        
+        // Fetch App Settings
+        const { data: settings } = await supabase.from('app_settings').select('*');
+        const settingsMap = (settings || []).reduce((acc: any, curr: any) => ({ ...acc, [curr.key]: curr.value }), {});
+
+        setDateOverride(settingsMap['addition_date_override'] || null);
+        setIsAdditionEnabled(settingsMap['game_enabled_addition'] !== false);
+        setIsNiftyEnabled(settingsMap['game_enabled_nifty'] !== false);
+        setIsPinEntryEnabled(settingsMap['pin_entry_enabled'] !== false);
+
+        // Fetch User Profiles
+        const { data: userProfiles } = await supabase.from('profiles').select('*');
+        setProfiles(userProfiles || []);
+        
+        setIsLoading(false);
+      };
+      fetchData();
+    }
+  }, [isAuthenticated]);
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,118 +57,72 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
     }
   };
 
+  // 2. Updated Toggle functions to save to 'app_settings' table
+  const updateSetting = async (key: string, value: any) => {
+    await supabase.from('app_settings').upsert({ key, value });
+  };
+
   const toggleAddition = () => {
     const newVal = !isAdditionEnabled;
     setIsAdditionEnabled(newVal);
-    localStorage.setItem('game_enabled_addition', newVal.toString());
+    updateSetting('game_enabled_addition', newVal);
   };
 
   const toggleNifty = () => {
     const newVal = !isNiftyEnabled;
     setIsNiftyEnabled(newVal);
-    localStorage.setItem('game_enabled_nifty', newVal.toString());
+    updateSetting('game_enabled_nifty', newVal);
   };
 
   const togglePinEntry = () => {
     const newVal = !isPinEntryEnabled;
     setIsPinEntryEnabled(newVal);
-    localStorage.setItem('pin_entry_enabled', newVal.toString());
+    updateSetting('pin_entry_enabled', newVal);
   };
 
   const updateDateOverride = (val: string) => {
     setDateOverride(val);
-    localStorage.setItem('addition_date_override', val);
+    updateSetting('addition_date_override', val);
   };
 
   const clearDateOverride = () => {
     setDateOverride(null);
-    localStorage.removeItem('addition_date_override');
+    updateSetting('addition_date_override', null);
   };
 
-  const updatePin = (user: 'ayaan' | 'riyaan', val: string) => {
+  // 3. Updated PIN and lock management to use 'profiles' table
+  const updatePin = async (id: string, val: string) => {
     if (val.length <= 6 && /^\d*$/.test(val)) {
-      if (user === 'ayaan') {
-        setAyaanPin(val);
-        localStorage.setItem('pin_ayaan', val);
-      } else {
-        setRiyaanPin(val);
-        localStorage.setItem('pin_riyaan', val);
-      }
+      setProfiles(prev => prev.map(p => p.id === id ? { ...p, pin: val } : p));
+      await supabase.from('profiles').update({ pin: val }).eq('id', id);
     }
   };
 
-  const resetUserLock = (user: 'ayaan' | 'riyaan') => {
-    localStorage.setItem(`pin_attempts_${user}`, '0');
-    if (user === 'ayaan') setAyaanAttempts(0);
-    else setRiyaanAttempts(0);
+  const resetUserLock = async (id: string) => {
+    setProfiles(prev => prev.map(p => p.id === id ? { ...p, pin_attempts: 0, is_locked: false } : p));
+    await supabase.from('profiles').update({ pin_attempts: 0, is_locked: false }).eq('id', id);
   };
 
-  // ---------------------------------------------------------
-  // 🧨 THE MASTER RESET FUNCTION (Updated for Cloud)
-  // ---------------------------------------------------------
-// ---------------------------------------------------------
-  // 🧨 THE MASTER RESET FUNCTION (Fixed to clear Refresh Locks)
-  // ---------------------------------------------------------
   const handleMasterReset = async () => {
-    const confirmed = window.confirm("⚠️ DANGER ZONE ⚠️\n\nThis will permanently DELETE ALL DATA from:\n1. The Cloud Database (Supabase)\n2. This Device\n\nAre you absolutely sure?");
-    
+    const confirmed = window.confirm("⚠️ DANGER ZONE ⚠️\n\nThis will permanently DELETE ALL DATA from the Cloud Database.");
     if (confirmed) {
       setIsResetting(true);
       try {
-        // 1. Delete Cloud Data
-        // We use a trick (.neq 'id', '0') to select all rows because Supabase requires a filter for deletes.
-        const { error: logError } = await supabase.from('addition_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        
-        if (logError) throw logError;
-
-        // 2. Delete Known Local Storage Keys
-        const keysToClear = [
-          'ayaan_earnings',
-          'riyaan_earnings',
-          'addition_history',
-          'ayaan_nifty_total',
-          'riyaan_nifty_total',
-          'nifty_history',
-          'pin_attempts_ayaan',
-          'pin_attempts_riyaan',
-          'pin_ayaan',
-          'pin_riyaan',
-          'addition_date_override',
-          'game_enabled_addition',
-          'game_enabled_nifty',
-          'pin_entry_enabled'
-        ];
-        
-        keysToClear.forEach(key => localStorage.removeItem(key));
-        
-        // 3. NEW: Hunt down and delete all "Attempt Locks" (The Refresh Bug Fix)
-        // We loop through all keys in storage and find any that start with "addition_attempt_"
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('addition_attempt_')) {
-            localStorage.removeItem(key);
-          }
-        });
-        
-        alert("✅ System Fully Wiped. App will now restart.");
+        await supabase.from('addition_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('nifty_logs').delete().neq('id', 0);
+        await supabase.from('game_attempts').delete().neq('id', 0);
+        alert("✅ Cloud Wiped. App will restart.");
         window.location.reload();
-        
       } catch (error) {
-        console.error("Reset Failed:", error);
-        alert("❌ Error wiping cloud data. Check console for details.");
+        alert("❌ Reset Failed.");
         setIsResetting(false);
       }
     }
   };
 
-  const getInputValue = () => {
-    if (!dateOverride) return '';
-    if (dateOverride.includes('T')) return dateOverride;
-    return `${dateOverride}T00:00`;
-  };
-
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 animate-in zoom-in-95 duration-300">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
         <div className="w-20 h-20 bg-slate-900 dark:bg-white rounded-3xl flex items-center justify-center mb-8">
           <Settings size={40} className="text-white dark:text-slate-900" />
         </div>
@@ -160,12 +137,14 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
             onChange={(e) => setAdminPassword(e.target.value)}
           />
           {adminError && <p className="text-center text-rose-500 text-xs font-bold uppercase tracking-widest">{adminError}</p>}
-          <button type="submit" className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all">Unlock</button>
+          <button type="submit" className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-widest shadow-xl">Unlock</button>
         </form>
         <button onClick={onBack} className="mt-8 text-slate-400 font-bold text-sm uppercase tracking-widest">Cancel</button>
       </div>
     );
   }
+
+  if (isLoading) return <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center font-black uppercase tracking-widest text-slate-400">Syncing with Supabase...</div>;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 animate-in slide-in-from-right duration-300">
@@ -179,7 +158,6 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
       </header>
 
       <div className="space-y-6 pb-24 max-w-md mx-auto">
-        {/* User Security Management */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
             <Lock size={20} className="text-indigo-500" />
@@ -192,76 +170,47 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
                 <Fingerprint size={20} className="text-indigo-600 dark:text-indigo-400" />
                 <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Require User PIN</span>
               </div>
-              <button onClick={togglePinEntry} className="transition-colors">
-                {isPinEntryEnabled ? <ToggleRight size={32} className="text-indigo-600" /> : <ToggleLeft size={32} className="text-slate-300 dark:text-slate-700" />}
+              <button onClick={togglePinEntry}>
+                {isPinEntryEnabled ? <ToggleRight size={32} className="text-indigo-600" /> : <ToggleLeft size={32} className="text-slate-300" />}
               </button>
             </div>
 
             <div className="space-y-8 pt-4 border-t border-slate-50 dark:border-slate-800">
-              <div className="space-y-4">
-                <div className="flex flex-col gap-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ayaan PIN</label>
-                  <input 
-                    type="text" 
-                    inputMode="numeric"
-                    maxLength={6}
-                    className="w-full h-14 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 px-4 font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none transition-all tabular-nums tracking-[0.2em]"
-                    value={ayaanPin}
-                    onChange={(e) => updatePin('ayaan', e.target.value)}
-                  />
-                </div>
-                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">Ayaan Attempts</span>
-                    <span className={`text-sm font-black ${ayaanAttempts >= 3 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                      {ayaanAttempts}/3 attempts {ayaanAttempts >= 3 && '(LOCKED)'}
-                    </span>
+              {profiles.map(profile => (
+                <div key={profile.id} className="space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{profile.player_name} PIN</label>
+                    <input 
+                      type="text" 
+                      inputMode="numeric"
+                      maxLength={6}
+                      className="w-full h-14 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 px-4 font-bold text-slate-900 dark:text-white outline-none transition-all tabular-nums tracking-[0.2em]"
+                      value={profile.pin}
+                      onChange={(e) => updatePin(profile.id, e.target.value)}
+                    />
                   </div>
-                  {ayaanAttempts > 0 && (
-                    <button 
-                      onClick={() => resetUserLock('ayaan')}
-                      className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 transition-colors"
-                    >
-                      <UserCheck size={20} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex flex-col gap-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Riyaan PIN</label>
-                  <input 
-                    type="text" 
-                    inputMode="numeric"
-                    maxLength={6}
-                    className="w-full h-14 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 px-4 font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none transition-all tabular-nums tracking-[0.2em]"
-                    value={riyaanPin}
-                    onChange={(e) => updatePin('riyaan', e.target.value)}
-                  />
-                </div>
-                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">Riyaan Attempts</span>
-                    <span className={`text-sm font-black ${riyaanAttempts >= 3 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                      {riyaanAttempts}/3 attempts {riyaanAttempts >= 3 && '(LOCKED)'}
-                    </span>
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-400 uppercase">Attempts</span>
+                      <span className={`text-sm font-black ${profile.pin_attempts >= 3 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                        {profile.pin_attempts}/3 {profile.pin_attempts >= 3 && '(LOCKED)'}
+                      </span>
+                    </div>
+                    {profile.pin_attempts > 0 && (
+                      <button 
+                        onClick={() => resetUserLock(profile.id)}
+                        className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl"
+                      >
+                        <UserCheck size={20} />
+                      </button>
+                    )}
                   </div>
-                  {riyaanAttempts > 0 && (
-                    <button 
-                      onClick={() => resetUserLock('riyaan')}
-                      className="p-3 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-xl hover:bg-rose-100 transition-colors"
-                    >
-                      <UserCheck size={20} />
-                    </button>
-                  )}
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Game Management */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
             <Gamepad2 size={20} className="text-indigo-500" />
@@ -270,80 +219,58 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
               <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Addition Game</span>
-              <button onClick={toggleAddition} className="transition-colors">
-                {isAdditionEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300 dark:text-slate-700" />}
+              <button onClick={toggleAddition}>
+                {isAdditionEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
               </button>
             </div>
             <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
               <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Nifty 50 Game</span>
-              <button onClick={toggleNifty} className="transition-colors">
-                {isNiftyEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300 dark:text-slate-700" />}
+              <button onClick={toggleNifty}>
+                {isNiftyEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
               </button>
             </div>
           </div>
         </div>
 
-        {/* App Date Settings */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
             <Calendar size={20} className="text-indigo-500" />
             <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">System Time Machine</h2>
           </div>
-          
           <div className="space-y-4">
             <div className="flex flex-col gap-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Override Date & Time</label>
               <input 
                 type="datetime-local" 
                 className="w-full h-14 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 px-4 font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none transition-all"
-                value={getInputValue()}
+                value={dateOverride || ''}
                 onChange={(e) => updateDateOverride(e.target.value)}
               />
             </div>
-            
             {dateOverride && (
               <button 
                 onClick={clearDateOverride}
-                className="w-full h-14 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 active:bg-indigo-100 transition-colors"
+                className="w-full h-14 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2"
               >
                 <RotateCcw size={18} /> Reset to Real-time
               </button>
             )}
-            
-            {!dateOverride && (
-              <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-800/30">
-                <p className="text-emerald-700 dark:text-emerald-400 text-xs font-bold leading-relaxed flex items-center gap-2">
-                  <Clock size={14} /> Currently Live: <span className="tabular-nums">{new Date().toLocaleString()}</span>
-                </p>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Danger Zone */}
         <div className="bg-rose-50 dark:bg-rose-950/20 rounded-3xl border border-rose-100 dark:border-rose-900/30 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
             <AlertTriangle size={20} className="text-rose-500" />
             <h2 className="text-sm font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest">Danger Zone</h2>
           </div>
-          <p className="text-[10px] font-bold text-rose-600/60 dark:text-rose-400/60 uppercase tracking-wider mb-4 px-1">
-            Careful: This action will permanently delete all scores from the CLOUD and this DEVICE.
-          </p>
           <button 
             onClick={handleMasterReset}
             disabled={isResetting}
-            className="w-full h-14 bg-rose-600 dark:bg-rose-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+            className="w-full h-14 bg-rose-600 dark:bg-rose-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20"
           >
             {isResetting ? <Clock className="animate-spin" size={18} /> : <Trash2 size={18} />}
             {isResetting ? 'WIPING CLOUD...' : 'MASTER RESET'}
           </button>
-        </div>
-
-        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-100 dark:border-amber-800/30">
-          <div className="flex items-center gap-3">
-            <ShieldAlert size={18} className="text-amber-500" />
-            <p className="text-amber-700 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">Admin controls apply system-wide</p>
-          </div>
         </div>
       </div>
     </div>

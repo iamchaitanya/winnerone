@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { ViewType } from '../types';
 import { PlusCircle, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart } from 'lucide-react';
@@ -7,24 +6,27 @@ interface HomeViewProps {
   onNavigate: (view: ViewType) => void;
   isDarkMode: boolean;
   onToggleDark: () => void;
+  settings: {
+    dateOverride: string | null;
+    additionEnabled: boolean;
+    niftyEnabled: boolean;
+  };
 }
 
-export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onToggleDark }) => {
-  const [isAdditionEnabled, setIsAdditionEnabled] = useState(true);
-  const [isNiftyEnabled, setIsNiftyEnabled] = useState(true);
+export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onToggleDark, settings }) => {
   const [timeLeft, setTimeLeft] = useState<{ days: number, hours: number, minutes: number } | null>(null);
   const [isGameEnded, setIsGameEnded] = useState(false);
 
   const endDate = new Date('2027-01-01T00:00:00');
 
+  // Updated to use settings.dateOverride from Supabase
   const getEffectiveDate = useCallback(() => {
-    const dateOverride = localStorage.getItem('addition_date_override');
     const now = new Date();
-    if (dateOverride) {
-      const d = new Date(dateOverride);
+    if (settings.dateOverride) {
+      const d = new Date(settings.dateOverride);
       if (isNaN(d.getTime())) return now;
-      if (!dateOverride.includes('T')) {
-        const [y, m, day] = dateOverride.split('-').map(Number);
+      if (!settings.dateOverride.includes('T')) {
+        const [y, m, day] = settings.dateOverride.split('-').map(Number);
         const localDate = new Date();
         localDate.setFullYear(y, m - 1, day);
         localDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
@@ -34,15 +36,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
       return d;
     }
     return now;
-  }, []);
+  }, [settings.dateOverride]);
 
   useEffect(() => {
-    // Read settings from local storage on mount
-    const addEnabled = localStorage.getItem('game_enabled_addition') !== 'false';
-    const niftyEnabled = localStorage.getItem('game_enabled_nifty') !== 'false';
-    setIsAdditionEnabled(addEnabled);
-    setIsNiftyEnabled(niftyEnabled);
-
     const updateTimer = () => {
       const current = getEffectiveDate();
       const diff = endDate.getTime() - current.getTime();
@@ -66,11 +62,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
 
   return (
     <div className="animate-in fade-in duration-700">
-      {/* Enhanced Premium Header */}
       <header className="relative bg-gradient-to-b from-indigo-100/50 via-white to-slate-50 dark:from-indigo-950/40 dark:via-slate-950 dark:to-slate-950 pt-24 pb-24 px-8 rounded-b-[4rem] shadow-[0_20px_50px_rgba(79,70,229,0.08)] dark:shadow-none border-b border-white dark:border-slate-800/50 overflow-hidden transition-all duration-500">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] dark:opacity-[0.05] mix-blend-overlay pointer-events-none"></div>
         
-        {/* Admin Login Button */}
         <button 
           onClick={() => onNavigate(ViewType.ADMIN)}
           className="absolute top-10 left-8 p-3 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 shadow-sm hover:shadow-md transition-all active:scale-90 text-slate-400 dark:text-slate-500 z-20"
@@ -79,7 +73,6 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
           <Lock size={20} />
         </button>
 
-        {/* Theme Toggle Button */}
         <button 
           onClick={onToggleDark}
           className="absolute top-10 right-8 p-3 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 shadow-sm hover:shadow-md transition-all active:scale-90 text-slate-600 dark:text-slate-300 z-20"
@@ -98,7 +91,6 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
             </span>
           </h1>
           
-          {/* Countdown Subtext - Removed animate-pulse to stop dimming */}
           {!isGameEnded && timeLeft && (
             <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em]">
               <Clock size={10} />
@@ -115,15 +107,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
           )}
         </div>
         
-        {/* Ambient background glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-indigo-500/10 dark:bg-indigo-500/5 rounded-full blur-[100px] -z-10"></div>
       </header>
 
-      {/* Main Entry Points or Closing Remarks */}
       <section className="px-6 mt-12 flex flex-col gap-4 pb-24 relative z-10">
         {isGameEnded ? (
           <div className="animate-in slide-in-from-bottom duration-1000">
-            {/* Closing Remarks Card */}
             <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-2xl shadow-indigo-500/5 text-center mb-6">
               <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
                 <Trophy size={32} />
@@ -138,7 +127,6 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
               </div>
             </div>
 
-            {/* Dashboard shortcut (Still accessible to view final stats) */}
             <button 
               onClick={() => onNavigate(ViewType.DASHBOARD)}
               className="flex flex-row items-center px-6 h-24 bg-indigo-600 dark:bg-indigo-500 text-white rounded-3xl shadow-xl shadow-indigo-200/40 dark:shadow-none transition-all group active:scale-[0.98] w-full"
@@ -156,47 +144,44 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
           </div>
         ) : (
           <>
-            {/* Addition Entry Point */}
             <button 
-              onClick={() => isAdditionEnabled && onNavigate(ViewType.ADDITION)}
+              onClick={() => settings.additionEnabled && onNavigate(ViewType.ADDITION)}
               className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${
-                isAdditionEnabled 
+                settings.additionEnabled 
                 ? 'hover:shadow-2xl hover:border-indigo-200 dark:hover:border-indigo-500/50 active:scale-[0.98]' 
                 : 'opacity-50 grayscale cursor-not-allowed'
               }`}
             >
               <div className="flex items-center gap-6 w-full">
-                <div className={`p-4 rounded-2xl transition-transform ${isAdditionEnabled ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                <div className={`p-4 rounded-2xl transition-transform ${settings.additionEnabled ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
                   <PlusCircle size={32} />
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">ADDITION</span>
-                  {!isAdditionEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10}/> Disabled by Admin</span>}
+                  {!settings.additionEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10}/> Disabled by Admin</span>}
                 </div>
               </div>
             </button>
 
-            {/* Nifty 50 Entry Point */}
             <button 
-              onClick={() => isNiftyEnabled && onNavigate(ViewType.NIFTY50)}
+              onClick={() => settings.niftyEnabled && onNavigate(ViewType.NIFTY50)}
               className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${
-                isNiftyEnabled 
+                settings.niftyEnabled 
                 ? 'hover:shadow-2xl hover:border-emerald-200 dark:hover:border-emerald-500/50 active:scale-[0.98]' 
                 : 'opacity-50 grayscale cursor-not-allowed'
               }`}
             >
               <div className="flex items-center gap-6 w-full">
-                <div className={`p-4 rounded-2xl transition-transform ${isNiftyEnabled ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                <div className={`p-4 rounded-2xl transition-transform ${settings.niftyEnabled ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
                   <TrendingUp size={32} />
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">NIFTY 50</span>
-                  {!isNiftyEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10}/> Disabled by Admin</span>}
+                  {!settings.niftyEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10}/> Disabled by Admin</span>}
                 </div>
               </div>
             </button>
 
-            {/* Dashboard Entry Point */}
             <button 
               onClick={() => onNavigate(ViewType.DASHBOARD)}
               className="flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none hover:shadow-2xl hover:border-violet-200 dark:hover:border-violet-500/50 transition-all group active:scale-[0.98]"
