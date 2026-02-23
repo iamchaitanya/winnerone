@@ -21,7 +21,7 @@ async function isHolidayToday(): Promise<boolean> {
     return true;
   }
 
-  // 3. Dynamic API Check (Same link your app uses)
+  // 3. Dynamic API Check
   try {
     const response = await fetch(HOLIDAY_API_URL, {
       headers: { 'Accept': 'application/json' }
@@ -64,7 +64,6 @@ async function fetchStockData() {
 
 Deno.serve(async (req) => {
   try {
-    // NEW: Check if we should even run today
     const shouldSkip = await isHolidayToday();
     if (shouldSkip) {
       return new Response(JSON.stringify({ message: "Market closed. No settlement today." }), { 
@@ -91,22 +90,30 @@ Deno.serve(async (req) => {
     for (const log of logs) {
       const symbol = log.stock_symbol;
       const returnVal = stockData[symbol] || 0;
-      // Replace line 95: const earnings = Math.round(returnVal * 10);
-// With this to preserve 2 decimal places:
-const earnings = parseFloat((returnVal * 10).toFixed(2));
+      
+      // FIXED: Preserving 2 decimal places instead of using Math.round()
+      const earnings = parseFloat((returnVal * 10).toFixed(2));
+      
       const dateStr = log.date;
 
       await supabase
         .from('nifty_logs')
-        .update({ stock_return: returnVal, earnings: earnings })
+        .update({ 
+          stock_return: returnVal, 
+          earnings: earnings 
+        })
         .eq('id', log.id);
 
       await supabase
         .from('stock_history')
-        .upsert({ date: dateStr, symbol: symbol, close_percentage: returnVal }, { onConflict: 'date,symbol' });
+        .upsert({ 
+          date: dateStr, 
+          symbol: symbol, 
+          close_percentage: returnVal 
+        }, { onConflict: 'date,symbol' });
     }
 
-    return new Response(JSON.stringify({ message: `Settled ${logs.length} entries.` }), { headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ message: `Settled ${logs.length} entries with decimal precision.` }), { headers: { "Content-Type": "application/json" } });
 
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json" } });

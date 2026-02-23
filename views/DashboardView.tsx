@@ -108,7 +108,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ayaan's Portfolio</h3>
             <div className="flex items-end gap-1 mb-6">
               <span className={`text-3xl font-black tabular-nums ${ayaanTotal < 0 ? 'text-rose-500' : 'text-slate-900 dark:text-white'}`}>
-                ₹{ayaanTotal.toLocaleString()}
+                ₹{ayaanTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
 
@@ -116,13 +116,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Addition (Cloud)</p>
                 <p className={`text-sm font-black ${ayaanAddition < 0 ? 'text-rose-500' : 'text-indigo-600 dark:text-indigo-400'}`}>
-                  {loading ? '...' : `₹${ayaanAddition.toLocaleString()}`}
+                  {loading ? '...' : `₹${ayaanAddition.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 </p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50 (Cloud)</p>
                 <p className={`text-sm font-black ${ayaanNifty < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                  ₹{ayaanNifty.toLocaleString()}
+                  ₹{ayaanNifty.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
@@ -137,7 +137,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Riyaan's Portfolio</h3>
             <div className="flex items-end gap-1 mb-6">
               <span className={`text-3xl font-black tabular-nums ${riyaanTotal < 0 ? 'text-rose-500' : 'text-slate-900 dark:text-white'}`}>
-                ₹{riyaanTotal.toLocaleString()}
+                ₹{riyaanTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
 
@@ -145,13 +145,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Addition (Cloud)</p>
                 <p className={`text-sm font-black ${riyaanAddition < 0 ? 'text-rose-500' : 'text-rose-600 dark:text-rose-400'}`}>
-                  {loading ? '...' : `₹${riyaanAddition.toLocaleString()}`}
+                  {loading ? '...' : `₹${riyaanAddition.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 </p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50 (Cloud)</p>
                 <p className={`text-sm font-black ${riyaanNifty < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                  ₹{riyaanNifty.toLocaleString()}
+                  ₹{riyaanNifty.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
@@ -172,7 +172,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
               <div>
                 <p className="text-4xl font-black tracking-tighter uppercase">{leader.name}</p>
                 <p className={`text-sm font-bold opacity-80 italic ${leader.total < 0 ? 'text-rose-300' : ''}`}>
-                  Total Achievement: ₹{leader.total.toLocaleString()}
+                  Total Achievement: ₹{leader.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
