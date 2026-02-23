@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { isMarketHoliday } from '../src/lib/holidayManager';
+import { isMarketHoliday, getMarketHolidayName } from '../src/lib/holidayManager';
 import { fetchAllLiveReturns } from '../src/lib/stockFetcher';
 import { supabase } from '../src/lib/supabase';
 
@@ -202,6 +202,7 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
           isPublicHoliday={isPublicHoliday} 
           hasPlayedToday={hasPlayedToday} 
           isUserLocked={(u) => Number(localStorage.getItem(`pin_attempts_${u?.toLowerCase()}`) || '0') >= 3} 
+          holidayReason={getMarketHolidayName(getEffectiveDate().toISOString().split('T')[0]) || 'Market Closed'}
         />
       );
     case NiftySubView.PIN_ENTRY:

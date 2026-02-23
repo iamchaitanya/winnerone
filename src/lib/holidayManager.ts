@@ -1,14 +1,12 @@
 // src/lib/holidayManager.ts
 
-const HOLIDAYS_CACHE_KEY = 'upstox_holidays_cache';
-const LAST_FETCH_KEY = 'upstox_last_fetch_date';
+// In-memory cache. This lives only while the app is open in the browser.
+// No localStorage means 100% consistency across devices, always fresh on load.
+let inMemoryHolidays: Record<string, string> | null = null;
 
 export async function fetchAndCacheHolidays(): Promise<void> {
-  const today = new Date().toISOString().split('T')[0];
-  const lastFetch = localStorage.getItem(LAST_FETCH_KEY);
-
-  // If we already fetched the list today, silently skip to keep the app fast
-  if (lastFetch === today) {
+  // If we already fetched it during this specific app session, skip to save network calls.
+  if (inMemoryHolidays !== null) {
     return;
   }
 
@@ -26,23 +24,23 @@ export async function fetchAndCacheHolidays(): Promise<void> {
 
     const json = await response.json();
     
-    // Extract dates from the Upstox API response
-    let fetchedHolidays: string[] = [];
+    // Extract dates and descriptions into a dictionary for O(1) lookup
+    let fetchedHolidays: Record<string, string> = {};
     if (json && Array.isArray(json.data)) {
-      // Upstox returns an array of objects in the 'data' property
-      fetchedHolidays = json.data.map((h: any) => h.date).filter(Boolean);
+      json.data.forEach((h: any) => {
+        if (h.date) {
+          fetchedHolidays[h.date] = h.description || 'Market Holiday';
+        }
+      });
     }
 
-    // Save the master list to localStorage
-    localStorage.setItem(HOLIDAYS_CACHE_KEY, JSON.stringify(fetchedHolidays));
-    
-    // Stamp today's date so we don't fetch again until tomorrow
-    localStorage.setItem(LAST_FETCH_KEY, today);
-    
-    console.log('Successfully updated holidays cache from Upstox API.');
+    // Save to the in-memory variable
+    inMemoryHolidays = fetchedHolidays;
+    console.log('Successfully fetched holidays from Upstox API into memory.');
   } catch (error) {
-    console.error('Error fetching holidays from Upstox. Falling back to cache.', error);
-    // If offline or API fails, it will gracefully fall back to the existing cache
+    console.error('Error fetching holidays from Upstox.', error);
+    // Initialize as empty object so we don't infinitely retry on failure if the API is down
+    inMemoryHolidays = {};
   }
 }
 
@@ -51,20 +49,28 @@ export function isMarketHoliday(dateString: string): boolean {
   const dateObj = new Date(dateString);
   const dayOfWeek = dateObj.getDay();
   if (dayOfWeek === 0 || dayOfWeek === 6) {
-    return true; // Always a holiday on weekends
+    return true; 
   }
 
-  // 2. Upstox API Cache Check
-  try {
-    const cachedData = localStorage.getItem(HOLIDAYS_CACHE_KEY);
-    if (cachedData) {
-      const holidays: string[] = JSON.parse(cachedData);
-      return holidays.includes(dateString);
-    }
-  } catch (e) {
-    console.error("Failed to parse holidays cache", e);
+  // 2. In-Memory Cache Check
+  if (inMemoryHolidays && inMemoryHolidays[dateString]) {
+    return true;
   }
 
-  // Safe fallback if the cache is empty and the API failed
   return false; 
+}
+
+export function getMarketHolidayName(dateString: string): string | null {
+  // 1. Check for weekends first
+  const dateObj = new Date(dateString);
+  const dayOfWeek = dateObj.getDay();
+  if (dayOfWeek === 0) return "Sunday";
+  if (dayOfWeek === 6) return "Saturday";
+
+  // 2. Check the in-memory cache for specific public holidays
+  if (inMemoryHolidays && inMemoryHolidays[dateString]) {
+    return inMemoryHolidays[dateString];
+  }
+
+  return null;
 }
