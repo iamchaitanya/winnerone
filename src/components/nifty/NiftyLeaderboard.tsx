@@ -47,7 +47,7 @@ export const NiftyLeaderboard: React.FC<NiftyLeaderboardProps> = ({
                 <div className="flex items-center justify-center gap-0.5 w-full px-3">
                   <IndianRupee size={16} className="text-slate-400 flex-shrink-0" />
                   <span className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white tabular-nums tracking-tighter">
-                    {leader.total.toLocaleString()}
+                    {leader.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -57,7 +57,7 @@ export const NiftyLeaderboard: React.FC<NiftyLeaderboardProps> = ({
                 <div className="flex items-center justify-center gap-0.5 w-full px-3">
                   <IndianRupee size={10} className="text-slate-400 flex-shrink-0" />
                   <span className="text-base sm:text-lg md:text-xl font-black text-slate-900 dark:text-white tabular-nums tracking-tighter">
-                    {runner.total.toLocaleString()}
+                    {runner.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -97,7 +97,7 @@ export const NiftyLeaderboard: React.FC<NiftyLeaderboardProps> = ({
                               {record.ayaan ? (
                                 <div className="flex flex-col">
                                   <span className={`text-sm font-black ${record.ayaan.isSettled ? (record.ayaan.earnings >= 0 ? 'text-emerald-500' : 'text-rose-500') : 'text-slate-400'}`}>
-                                    {record.ayaan.isSettled ? (record.ayaan.earnings > 0 ? '+' : '') + record.ayaan.earnings.toLocaleString() : 'PENDING'}
+                                    {record.ayaan.isSettled ? (record.ayaan.earnings > 0 ? '+' : '') + record.ayaan.earnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'PENDING'}
                                   </span>
                                   <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">{record.ayaan.symbol}</span>
                                 </div>
@@ -107,7 +107,7 @@ export const NiftyLeaderboard: React.FC<NiftyLeaderboardProps> = ({
                               {record.riyaan ? (
                                 <div className="flex flex-col">
                                   <span className={`text-sm font-black ${record.riyaan.isSettled ? (record.riyaan.earnings >= 0 ? 'text-emerald-500' : 'text-rose-500') : 'text-slate-400'}`}>
-                                    {record.riyaan.isSettled ? (record.riyaan.earnings > 0 ? '+' : '') + record.riyaan.earnings.toLocaleString() : 'PENDING'}
+                                    {record.riyaan.isSettled ? (record.riyaan.earnings > 0 ? '+' : '') + record.riyaan.earnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'PENDING'}
                                   </span>
                                   <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">{record.riyaan.symbol}</span>
                                 </div>

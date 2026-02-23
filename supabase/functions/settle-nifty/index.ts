@@ -91,7 +91,9 @@ Deno.serve(async (req) => {
     for (const log of logs) {
       const symbol = log.stock_symbol;
       const returnVal = stockData[symbol] || 0;
-      const earnings = Math.round(returnVal * 10);
+      // Replace line 95: const earnings = Math.round(returnVal * 10);
+// With this to preserve 2 decimal places:
+const earnings = parseFloat((returnVal * 10).toFixed(2));
       const dateStr = log.date;
 
       await supabase

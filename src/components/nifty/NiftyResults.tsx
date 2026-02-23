@@ -62,7 +62,7 @@ export const NiftyResults: React.FC<NiftyResultsProps> = ({
       
       {isReady ? (
         <div className={`text-6xl font-black mb-8 tabular-nums ${mySession.earnings > 0 ? 'text-emerald-500' : mySession.earnings < 0 ? 'text-rose-500' : 'text-slate-400'}`}>
-          {mySession.earnings > 0 ? '+' : ''}₹{mySession.earnings.toLocaleString()}
+          {mySession.earnings > 0 ? '+' : ''}₹{mySession.earnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       ) : (
         <div className="px-8 py-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm mb-8">
@@ -73,7 +73,7 @@ export const NiftyResults: React.FC<NiftyResultsProps> = ({
 
       {isReady && (
         <div className={`mb-8 px-6 py-2 rounded-full border flex items-center gap-2 font-black text-[10px] uppercase tracking-widest ${isDailyTotalPositive ? 'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-950/30 dark:border-emerald-800' : dailyTotalEarnings < 0 ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-950/30 dark:border-rose-800' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
-          Daily Group Status: <span className="tabular-nums">₹{dailyTotalEarnings.toLocaleString()}</span>
+          Daily Group Status: <span className="tabular-nums">₹{dailyTotalEarnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           {isDailyTotalPositive ? <TrendingUp size={12} /> : dailyTotalEarnings < 0 ? <TrendingDown size={12} /> : null}
         </div>
       )}
@@ -100,7 +100,7 @@ export const NiftyResults: React.FC<NiftyResultsProps> = ({
                     {mySession.stockReturn >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                     {mySession.stockReturn.toFixed(2)}%
                   </div>
-                  <p className="text-[9px] font-bold text-slate-400 mt-0.5">₹{mySession.earnings}</p>
+                  <p className="text-[9px] font-bold text-slate-400 mt-0.5">₹{mySession.earnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
               ) : (
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active</span>
@@ -129,7 +129,7 @@ export const NiftyResults: React.FC<NiftyResultsProps> = ({
                       {sibSession.stockReturn >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                       {sibSession.stockReturn.toFixed(2)}%
                     </div>
-                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">₹{sibSession.earnings}</p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">₹{sibSession.earnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
                 ) : (
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active</span>
