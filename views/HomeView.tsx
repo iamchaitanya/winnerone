@@ -1,25 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ViewType } from '../types';
 import { PlusCircle, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart } from 'lucide-react';
+import { useGameStore } from '../src/store/useGameStore'; // Added store import
 
 interface HomeViewProps {
   onNavigate: (view: ViewType) => void;
   isDarkMode: boolean;
   onToggleDark: () => void;
-  settings: {
-    dateOverride: string | null;
-    additionEnabled: boolean;
-    niftyEnabled: boolean;
-  };
+  // settings prop removed from here
 }
 
-export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onToggleDark, settings }) => {
+export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onToggleDark }) => {
+  // Grab settings directly from the global store
+  const settings = useGameStore((state) => state.settings);
+  
   const [timeLeft, setTimeLeft] = useState<{ days: number, hours: number, minutes: number } | null>(null);
   const [isGameEnded, setIsGameEnded] = useState(false);
 
   const endDate = new Date('2027-01-01T00:00:00');
 
-  // Updated to use settings.dateOverride from Supabase
   const getEffectiveDate = useCallback(() => {
     const now = new Date();
     if (settings.dateOverride) {

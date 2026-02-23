@@ -1,16 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
-// @ts-ignore
+// Environment variables are now strictly typed via vite-env.d.ts
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-// @ts-ignore
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-console.log("--- SUPABASE DEBUG ---");
-console.log("URL:", supabaseUrl);
-console.log("Key Exists?", !!supabaseAnonKey);
-console.log("----------------------");
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase Environment Variables. Check your .env file.');
+}
 
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseAnonKey || 'placeholder-key'
-);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);

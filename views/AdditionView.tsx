@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { isMarketHoliday } from '../src/lib/holidayManager';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
+import { useGameStore } from '../src/store/useGameStore'; // Added store import
 
 // Hook Import
 import { useAdditionEngine } from '../src/hooks/useAdditionEngine';
@@ -64,13 +65,17 @@ interface DailyRecord {
 }
 
 export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
+  // Grab global state directly from Zustand
+  const settings = useGameStore((state) => state.settings);
+  const profiles = useGameStore((state) => state.profiles);
+
   const [subView, setSubView] = useState<AdditionSubView>(AdditionSubView.HUB);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [historyFilter, setHistoryFilter] = useState<'Ayaan' | 'Riyaan'>('Ayaan');
   
-  // Settings & Timing
-  const [dateOverride] = useState<string | null>(() => localStorage.getItem('addition_date_override'));
-  const isPinEntryEnabled = localStorage.getItem('pin_entry_enabled') !== 'false';
+  // Settings & Timing (Now powered by Store)
+  const dateOverride = settings.dateOverride;
+  const isPinEntryEnabled = settings.pinEntryEnabled;
   const isSubmittingRef = useRef(false); 
 
   // Persistent & Local Results State
@@ -81,6 +86,11 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const [finalSessionEarnings, setFinalSessionEarnings] = useState(0);
   const [finalScore, setFinalScore] = useState(0);
   const [finalWrong, setFinalWrong] = useState(0);
+
+  // Helper to safely get profile
+  const getUserProfile = useCallback((name: string | null) => {
+    return profiles.find(p => p.player_name === name);
+  }, [profiles]);
 
   // ☁️ Cloud Sync on Mount
   useEffect(() => {
@@ -97,12 +107,14 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
       let rTotal = 0;
       
       const cloudHistory: GameSession[] = data.map((log: any) => {
-        if (log.player_id === PLAYER_IDS.Ayaan) aTotal += log.earnings;
-        if (log.player_id === PLAYER_IDS.Riyaan) rTotal += log.earnings;
+        // Map DB UUID back to UI name safely
+        const pName = log.player_id === PLAYER_IDS.Ayaan ? 'Ayaan' : 'Riyaan';
+        if (pName === 'Ayaan') aTotal += log.earnings;
+        if (pName === 'Riyaan') rTotal += log.earnings;
 
         return {
           id: log.id,
-          player: log.player_id === PLAYER_IDS.Ayaan ? 'Ayaan' : 'Riyaan',
+          player: pName,
           score: log.score,
           wrong: log.wrong_count,
           earnings: log.earnings,
@@ -149,7 +161,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     if (!player) return false;
     const today = getEffectiveDate().toDateString();
     const inHistory = history.some(s => s.player === player && new Date(s.timestamp).toDateString() === today);
-    const attemptKey = `addition_attempt_${player}_${today}`;
+    const attemptKey = `addition_attempt_${player}_${today}`; // Keeping local attempt key for immediate crash protection
     return inHistory || localStorage.getItem(attemptKey) === 'started';
   }, [history, getEffectiveDate]);
 
@@ -185,9 +197,12 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     };
     setHistory(prev => [newSession, ...prev].slice(0, 500));
 
-    if (selectedUser && PLAYER_IDS[selectedUser]) {
+    if (selectedUser) {
+      const userProfile = getUserProfile(selectedUser);
+      const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
+      
       await supabase.from('addition_logs').insert({
-        player_id: PLAYER_IDS[selectedUser],
+        player_id: playerId, // Now using strict UUIDs
         score: fScore,
         wrong_count: fWrong,
         earnings,
@@ -198,7 +213,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
 
     setSubView(AdditionSubView.RESULTS);
     isSubmittingRef.current = false; 
-  }, [selectedUser, getEffectiveDate]);
+  }, [selectedUser, getEffectiveDate, getUserProfile]);
 
   // 🧠 Addition Engine Hook
   const {
@@ -222,21 +237,26 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     setSubView(AdditionSubView.QUIZ);
   };
 
-  // 🔐 PIN Logic
-  const getUserAttempts = (user: string | null) => Number(localStorage.getItem(`pin_attempts_${user?.toLowerCase()}`) || '0');
-  const isUserLocked = (user: string | null) => getUserAttempts(user) >= 3;
+  // 🔐 PIN Logic Powered by Cloud Profiles
+  const getUserAttempts = (user: string | null) => getUserProfile(user)?.pin_attempts || 0;
+  const isUserLocked = (user: string | null) => getUserProfile(user)?.is_locked || false;
 
   const handleVerifyPin = async (pin: string) => {
-    const correctPin = selectedUser === 'Ayaan' 
-      ? (localStorage.getItem('pin_ayaan') || '123456') 
-      : (localStorage.getItem('pin_riyaan') || '654321');
-    
-    if (pin === correctPin) {
-      localStorage.setItem(`pin_attempts_${selectedUser?.toLowerCase()}`, '0');
+    const profile = getUserProfile(selectedUser);
+    if (!profile) return false;
+
+    if (pin === profile.pin) {
+      // Reset attempts in the cloud upon success
+      await supabase.from('profiles').update({ pin_attempts: 0 }).eq('id', profile.id);
       return true;
     }
-    const nextAttempts = getUserAttempts(selectedUser) + 1;
-    localStorage.setItem(`pin_attempts_${selectedUser?.toLowerCase()}`, nextAttempts.toString());
+    
+    // Increment attempts in the cloud upon failure
+    const nextAttempts = (profile.pin_attempts || 0) + 1;
+    const updates: any = { pin_attempts: nextAttempts };
+    if (nextAttempts >= 3) updates.is_locked = true;
+    await supabase.from('profiles').update(updates).eq('id', profile.id);
+    
     return false;
   };
 

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { isMarketHoliday, getMarketHolidayName } from '../src/lib/holidayManager';
 import { fetchAllLiveReturns } from '../src/lib/stockFetcher';
 import { supabase } from '../src/lib/supabase';
+import { PLAYER_IDS } from '../src/lib/constants';
+import { useGameStore } from '../src/store/useGameStore'; // Added store import
 
 // Import modular components
 import { NiftyHub } from '../src/components/nifty/NiftyHub';
@@ -14,6 +16,7 @@ import { NiftyHistory } from '../src/components/nifty/NiftyHistory';
 
 interface Nifty50ViewProps {
   onBack: () => void;
+  // settings and profiles removed from here
 }
 
 enum NiftySubView {
@@ -28,6 +31,7 @@ enum NiftySubView {
 
 interface NiftySession {
   id: string;
+  player_id?: string;
   player: string;
   symbol: string;
   stockReturn: number;
@@ -37,6 +41,10 @@ interface NiftySession {
 }
 
 export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
+  // Grab global state directly
+  const settings = useGameStore((state) => state.settings);
+  const profiles = useGameStore((state) => state.profiles);
+
   const [subView, setSubView] = useState<NiftySubView>(NiftySubView.HUB);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [isSettling, setIsSettling] = useState(false);
@@ -44,8 +52,8 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   const [liveDataError, setLiveDataError] = useState(false);
   const [liveStockData, setLiveStockData] = useState<Record<string, { price: number; changesPercentage: number }>>({});
 
-  const isPinEntryEnabled = localStorage.getItem('pin_entry_enabled') !== 'false';
-  const dateOverride = localStorage.getItem('addition_date_override');
+  const isPinEntryEnabled = settings.pinEntryEnabled;
+  const dateOverride = settings.dateOverride;
   const [niftyHistory, setNiftyHistory] = useState<NiftySession[]>([]);
 
   // Score Calculations
@@ -114,21 +122,26 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   };
 
   const handleStockPick = async (symbol: string) => {
-    if (isSubmitting || !isBeforePickDeadline()) return;
+    if (isSubmitting || !isBeforePickDeadline() || !selectedUser) return;
     setIsSubmitting(true);
     const todayStr = getEffectiveDate().toISOString().split('T')[0];
+
+    const userProfile = profiles.find(p => p.player_name === selectedUser);
+    const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
 
     try {
       const { error } = await supabase.from('nifty_logs').insert([{ 
         date: todayStr, 
-        player: selectedUser!, 
+        player_id: playerId,
+        player: selectedUser, 
         stock_symbol: symbol 
       }]);
       if (error) throw error;
 
       const newSession: NiftySession = {
         id: Math.random().toString(36).substr(2, 9),
-        player: selectedUser!,
+        player_id: playerId,
+        player: selectedUser,
         symbol,
         stockReturn: 0,
         earnings: 0,
@@ -145,7 +158,6 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     }
   };
 
-  // FETCH DATA ONCE ON MOUNT (polling removed)
   useEffect(() => {
     const sync = async () => {
       const { data } = await supabase
@@ -156,6 +168,7 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
       if (data) {
         const synced = data.map(db => ({
           id: db.id, 
+          player_id: db.player_id,
           player: db.player, 
           symbol: db.stock_symbol,
           stockReturn: db.stock_return || 0, 
@@ -185,6 +198,11 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     return Object.values(groups).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [niftyHistory]);
 
+  const isUserLocked = (u: string) => {
+    const p = profiles.find(prof => prof.player_name === u);
+    return p ? p.is_locked : false;
+  };
+
   // Render Logic
   switch (subView) {
     case NiftySubView.HUB:
@@ -201,8 +219,7 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
           isWeekend={isWeekend} 
           isPublicHoliday={isPublicHoliday} 
           hasPlayedToday={hasPlayedToday} 
-          isUserLocked={(u) => Number(localStorage.getItem(`pin_attempts_${u?.toLowerCase()}`) || '0') >= 3} 
-          holidayReason={getMarketHolidayName(getEffectiveDate().toISOString().split('T')[0]) || 'Market Closed'}
+          isUserLocked={isUserLocked} 
         />
       );
     case NiftySubView.PIN_ENTRY:

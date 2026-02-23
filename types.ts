@@ -1,4 +1,3 @@
-
 export enum ViewType {
   HOME = 'home',
   ADDITION = 'addition',
@@ -15,20 +14,34 @@ export interface StockData {
   changePercent: number;
 }
 
-// Major Indian Market Holidays 2025
-export const MARKET_HOLIDAYS_2025 = [
-  '2025-01-26', // Republic Day
-  '2025-02-26', // Maha Shivaratri
-  '2025-03-14', // Holi
-  '2025-03-31', // Id-ul-Fitr
-  '2025-04-10', // Mahavir Jayanti
-  '2025-04-14', // Dr. Ambedkar Jayanti
-  '2025-04-18', // Good Friday
-  '2025-05-01', // Maharashtra Day
-  '2025-08-15', // Independence Day
-  '2025-09-05', // Ganesh Chaturthi
-  '2025-10-02', // Gandhi Jayanti
-  '2025-10-20', // Diwali Laxmi Pujan
-  '2025-11-05', // Guru Nanak Jayanti
-  '2025-12-25', // Christmas
-];
+/**
+ * Strict interfaces representing your Supabase Table Schema.
+ * Use these to replace 'any' in your state and function definitions.
+ */
+
+export interface AppSetting {
+  key: 'addition_date_override' | 'game_enabled_addition' | 'game_enabled_nifty' | 'pin_entry_enabled';
+  value: string | boolean | null;
+}
+
+export interface Profile {
+  id: string;
+  display_name: string;
+  avatar_url?: string;
+  // Add other fields from your 'profiles' table here as needed
+}
+
+export interface AdditionLog {
+  id?: string;
+  player_id: string;
+  earnings: number;
+  created_at?: string;
+}
+
+export interface NiftyLog {
+  id?: string;
+  player: string; // Currently using name strings in your nifty_logs table
+  earnings: number;
+  created_at?: string;
+}
+

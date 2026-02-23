@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Settings, Calendar, RotateCcw, ToggleLeft, ToggleRight, Gamepad2, Clock, Lock, UserCheck, Trash2, AlertTriangle, Fingerprint, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Settings, Calendar, RotateCcw, ToggleLeft, ToggleRight, Gamepad2, Clock, Lock, UserCheck, Trash2, AlertTriangle, Fingerprint } from 'lucide-react';
 import { supabase } from '../src/lib/supabase'; 
+import { useGameStore } from '../src/store/useGameStore'; // Added store import
 
 interface AdminViewProps {
   onBack: () => void;
-  settings: {
-    dateOverride: string | null;
-    additionEnabled: boolean;
-    niftyEnabled: boolean;
-    pinEntryEnabled: boolean;
-  };
-  profiles: any[];
-  onUpdateSetting: (key: string, value: any) => Promise<void>;
+  // settings, profiles, and onUpdateSetting props removed completely
 }
 
-export const AdminView: React.FC<AdminViewProps> = ({ onBack, settings, profiles, onUpdateSetting }) => {
+export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
+  // Grab global state directly from Zustand
+  const settings = useGameStore((state) => state.settings);
+  const profiles = useGameStore((state) => state.profiles);
+  const setSettings = useGameStore((state) => state.setSettings);
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [adminError, setAdminError] = useState('');
@@ -27,10 +26,28 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack, settings, profiles
     setLocalProfiles(profiles);
   }, [profiles]);
 
+  // Handle saving settings to DB and Store
+  const handleUpdateSetting = async (key: string, value: any) => {
+    const keyMap: Record<string, string> = {
+      'addition_date_override': 'dateOverride',
+      'game_enabled_addition': 'additionEnabled',
+      'game_enabled_nifty': 'niftyEnabled',
+      'pin_entry_enabled': 'pinEntryEnabled'
+    };
+    
+    // Optimistic UI update via Zustand
+    const storeKey = keyMap[key];
+    if (storeKey) {
+      setSettings({ [storeKey]: value });
+    }
+    
+    // Cloud update
+    await supabase.from('app_settings').upsert({ key, value });
+  };
+
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Fetch the secure PIN from Supabase
     const { data, error } = await supabase
       .from('app_settings')
       .select('value')
@@ -50,28 +67,13 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack, settings, profiles
     }
   };
 
-  // 2. Updated Toggle functions using lifted state
-  const toggleAddition = () => {
-    onUpdateSetting('game_enabled_addition', !settings.additionEnabled);
-  };
+  // Toggles using the new self-contained update handler
+  const toggleAddition = () => handleUpdateSetting('game_enabled_addition', !settings.additionEnabled);
+  const toggleNifty = () => handleUpdateSetting('game_enabled_nifty', !settings.niftyEnabled);
+  const togglePinEntry = () => handleUpdateSetting('pin_entry_enabled', !settings.pinEntryEnabled);
+  const updateDateOverride = (val: string) => handleUpdateSetting('addition_date_override', val);
+  const clearDateOverride = () => handleUpdateSetting('addition_date_override', null);
 
-  const toggleNifty = () => {
-    onUpdateSetting('game_enabled_nifty', !settings.niftyEnabled);
-  };
-
-  const togglePinEntry = () => {
-    onUpdateSetting('pin_entry_enabled', !settings.pinEntryEnabled);
-  };
-
-  const updateDateOverride = (val: string) => {
-    onUpdateSetting('addition_date_override', val);
-  };
-
-  const clearDateOverride = () => {
-    onUpdateSetting('addition_date_override', null);
-  };
-
-  // 3. Updated PIN and lock management to use 'profiles' table
   const updatePin = async (id: string, val: string) => {
     if (val.length <= 6 && /^\d*$/.test(val)) {
       setLocalProfiles(prev => prev.map(p => p.id === id ? { ...p, pin: val } : p));
@@ -89,13 +91,17 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack, settings, profiles
     if (confirmed) {
       setIsResetting(true);
       try {
-        await supabase.from('addition_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('nifty_logs').delete().neq('id', 0);
-        await supabase.from('game_attempts').delete().neq('id', 0);
+        // Fixed UUID deletion logic to prevent type crashing
+        const safeUUID = '00000000-0000-0000-0000-000000000000';
+        await supabase.from('addition_logs').delete().neq('id', safeUUID);
+        await supabase.from('nifty_logs').delete().neq('id', safeUUID);
+        await supabase.from('game_attempts').delete().not('id', 'is', null); // Safest fallback for any type
+        
         alert("✅ Cloud Wiped. App will restart.");
         window.location.reload();
       } catch (error) {
-        alert("❌ Reset Failed.");
+        alert("❌ Reset Failed. Check Console.");
+        console.error(error);
         setIsResetting(false);
       }
     }
@@ -137,6 +143,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack, settings, profiles
       </header>
 
       <div className="space-y-6 pb-24 max-w-md mx-auto">
+        {/* Security Management */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
             <Lock size={20} className="text-indigo-500" />
@@ -190,6 +197,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack, settings, profiles
           </div>
         </div>
 
+        {/* Game Management */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
             <Gamepad2 size={20} className="text-indigo-500" />
@@ -211,6 +219,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack, settings, profiles
           </div>
         </div>
 
+        {/* System Time Machine */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
             <Calendar size={20} className="text-indigo-500" />
@@ -237,6 +246,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack, settings, profiles
           </div>
         </div>
 
+        {/* Danger Zone */}
         <div className="bg-rose-50 dark:bg-rose-950/20 rounded-3xl border border-rose-100 dark:border-rose-900/30 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
             <AlertTriangle size={20} className="text-rose-500" />

@@ -1,11 +1,28 @@
 // src/lib/holidayManager.ts
 
-// In-memory cache. This lives only while the app is open in the browser.
-// No localStorage means 100% consistency across devices, always fresh on load.
+/**
+ * Interface representing the structure of a single holiday object 
+ * from the Upstox API.
+ */
+interface UpstoxHoliday {
+  date: string;
+  description: string;
+  day?: string;
+}
+
+/**
+ * Interface for the full Upstox API response.
+ */
+interface UpstoxResponse {
+  status: string;
+  data: UpstoxHoliday[];
+}
+
+// In-memory cache. Lives only while the app is open.
 let inMemoryHolidays: Record<string, string> | null = null;
 
 export async function fetchAndCacheHolidays(): Promise<void> {
-  // If we already fetched it during this specific app session, skip to save network calls.
+  // Skip if already fetched in this session
   if (inMemoryHolidays !== null) {
     return;
   }
@@ -22,24 +39,23 @@ export async function fetchAndCacheHolidays(): Promise<void> {
       throw new Error(`Failed to fetch holidays: ${response.status}`);
     }
 
-    const json = await response.json();
+    const json: UpstoxResponse = await response.json();
     
     // Extract dates and descriptions into a dictionary for O(1) lookup
     let fetchedHolidays: Record<string, string> = {};
     if (json && Array.isArray(json.data)) {
-      json.data.forEach((h: any) => {
+      json.data.forEach((h: UpstoxHoliday) => {
         if (h.date) {
           fetchedHolidays[h.date] = h.description || 'Market Holiday';
         }
       });
     }
 
-    // Save to the in-memory variable
     inMemoryHolidays = fetchedHolidays;
     console.log('Successfully fetched holidays from Upstox API into memory.');
   } catch (error) {
     console.error('Error fetching holidays from Upstox.', error);
-    // Initialize as empty object so we don't infinitely retry on failure if the API is down
+    // Fallback to empty object to prevent infinite retries
     inMemoryHolidays = {};
   }
 }
