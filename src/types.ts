@@ -26,9 +26,13 @@ export interface AppSetting {
 
 export interface Profile {
   id: string;
-  display_name: string;
-  avatar_url?: string;
-  // Add other fields from your 'profiles' table here as needed
+  username: string;
+  player_name: string; // Add this
+  role: string;
+  pin: string;
+  pin_attempts: number; // Add this
+  is_locked: boolean;   // Add this
+  created_at?: string;
 }
 
 export interface AdditionLog {

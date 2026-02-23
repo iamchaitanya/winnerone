@@ -4,7 +4,7 @@ import { AdditionView } from './views/AdditionView';
 import { Nifty50View } from './views/Nifty50View';
 import { DashboardView } from './views/DashboardView';
 import { AdminView } from './views/AdminView';
-import { ViewType, AppSetting, Profile } from './types';
+import { ViewType, AppSetting, Profile } from './src/types';
 
 import { supabase } from './src/lib/supabase';
 import { fetchAndCacheHolidays } from './src/lib/holidayManager';

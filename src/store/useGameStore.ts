@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Profile } from '../types';
+import { Profile } from '../types.ts';
 
 // Define the shape of our global state
 interface GameState {

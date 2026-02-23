@@ -98,41 +98,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
 
       <div className="p-6 space-y-6 max-w-4xl mx-auto">
         
-        {/* Season Leader Section (Moved to Top) */}
-        <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-8 opacity-10 -rotate-12 scale-150">
-            <Trophy size={100} />
-          </div>
-          <div className="relative z-10">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] mb-2 opacity-80">Season Leader</h4>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center">
-                <Crown size={32} />
-              </div>
-              <div>
-                <p className="text-4xl font-black tracking-tighter uppercase">{leaderName}</p>
-                <div className="flex flex-col gap-1 mt-1">
-                  <p className={`text-xl font-black ${leaderTotalWithBonus < 0 ? 'text-rose-300' : ''}`}>
-                    {formatCurrency(leaderTotalWithBonus)}
-                  </p>
-                  {leaderBonus > 0 && (
-                    <p className="text-xs font-bold text-emerald-300 flex items-center gap-1 uppercase tracking-wider">
-                      <Zap size={12} /> Includes 30% Bonus ({formatCurrency(leaderBonus)})
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            {/* Restored Progress Bar */}
-            <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden mt-6">
-              <div 
-                className="h-full bg-white rounded-full transition-all duration-1000" 
-                style={{ width: `${Math.max(5, (Math.abs(leaderTotalWithBonus) / (adjustedGrandTotal || 1)) * 100)}%` }}
-              />
-            </div>
-          </div>
-        </div>
+{/* Season Leader Section */}
+<div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-10 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden group">
+  
+  {/* Half-Visible Circular Badge */}
+  {leaderBonus > 0 && (
+    <div className="absolute -top-6 -right-6 w-28 h-28 bg-amber-400 text-indigo-950 rounded-full flex items-center justify-center shadow-2xl z-20 border-[12px] border-white/10">
+      <div className="mr-4 mt-4">
+        <span className="text-3xl font-black leading-none tracking-tighter">1.3x</span>
+      </div>
+    </div>
+  )}
+
+  <div className="absolute top-0 left-0 p-8 opacity-5 scale-125">
+    <Trophy size={100} />
+  </div>
+  
+  <div className="relative z-10 flex flex-col items-center text-center">
+    <div className="w-16 h-16 bg-white/10 backdrop-blur-xl rounded-2xl flex items-center justify-center border border-white/20 mb-4 shadow-inner">
+      <Crown size={32} className="text-amber-300" />
+    </div>
+    
+    <h4 className="text-[10px] font-black uppercase tracking-[0.4em] mb-2 opacity-60">Season Leader</h4>
+    
+    <p className="text-4xl font-black tracking-tighter uppercase mb-4">
+      {leaderName}
+    </p>
+    
+    {/* Centered Large Amount */}
+    <div className="relative">
+      <p className="text-6xl font-black tabular-nums tracking-tight text-amber-300 drop-shadow-2xl">
+        {formatCurrency(leaderTotalWithBonus)}
+      </p>
+      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-24 h-1 bg-amber-400/30 rounded-full blur-sm"></div>
+    </div>
+  </div>
+</div>
 
         {/* Individual Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ViewType } from '../types';
+import { ViewType } from '../src/types';
 import { PlusCircle, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart } from 'lucide-react';
 import { useGameStore } from '../src/store/useGameStore'; // Added store import
 
