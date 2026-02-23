@@ -3,7 +3,7 @@ import { isMarketHoliday } from '../src/lib/holidayManager';
 import { fetchAllLiveReturns } from '../src/lib/stockFetcher';
 import { supabase } from '../src/lib/supabase';
 
-// Import our new modular components
+// Import modular components
 import { NiftyHub } from '../src/components/nifty/NiftyHub';
 import { NiftyPinEntry } from '../src/components/nifty/NiftyPinEntry';
 import { NiftyPlayerSelect } from '../src/components/nifty/NiftyPlayerSelect';
@@ -44,13 +44,9 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   const [liveDataError, setLiveDataError] = useState(false);
   const [liveStockData, setLiveStockData] = useState<Record<string, { price: number; changesPercentage: number }>>({});
 
-  // Settings & Persistent State
   const isPinEntryEnabled = localStorage.getItem('pin_entry_enabled') !== 'false';
   const dateOverride = localStorage.getItem('addition_date_override');
-  const [niftyHistory, setNiftyHistory] = useState<NiftySession[]>(() => {
-    const saved = localStorage.getItem('nifty_history');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [niftyHistory, setNiftyHistory] = useState<NiftySession[]>([]);
 
   // Score Calculations
   const ayaanNiftyTotal = useMemo(() => 
@@ -87,6 +83,7 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   }, [getEffectiveDate]);
 
   const isBeforePickDeadline = useCallback(() => getEffectiveDate().getHours() < 9 && isMarketOpenDay(), [getEffectiveDate, isMarketOpenDay]);
+  
   const isAfterMarketClose = useCallback(() => {
     if (!isMarketOpenDay()) return false;
     const d = getEffectiveDate();
@@ -122,7 +119,11 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     const todayStr = getEffectiveDate().toISOString().split('T')[0];
 
     try {
-      const { error } = await supabase.from('nifty_logs').insert([{ date: todayStr, player: selectedUser!, stock_symbol: symbol }]);
+      const { error } = await supabase.from('nifty_logs').insert([{ 
+        date: todayStr, 
+        player: selectedUser!, 
+        stock_symbol: symbol 
+      }]);
       if (error) throw error;
 
       const newSession: NiftySession = {
@@ -144,22 +145,28 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     }
   };
 
-  // Cloud Sync & Data Fetching
+  // FETCH DATA ONCE ON MOUNT (polling removed)
   useEffect(() => {
     const sync = async () => {
-      const { data } = await supabase.from('nifty_logs').select('*').order('date', { ascending: false });
+      const { data } = await supabase
+        .from('nifty_logs')
+        .select('*')
+        .order('date', { ascending: false });
+        
       if (data) {
         const synced = data.map(db => ({
-          id: db.id, player: db.player, symbol: db.stock_symbol,
-          stockReturn: db.stock_return || 0, earnings: db.earnings || 0,
-          timestamp: new Date(db.created_at).getTime(), isSettled: db.stock_return !== null
+          id: db.id, 
+          player: db.player, 
+          symbol: db.stock_symbol,
+          stockReturn: db.stock_return || 0, 
+          earnings: db.earnings || 0,
+          timestamp: new Date(db.created_at).getTime(), 
+          isSettled: db.stock_return !== null
         }));
         setNiftyHistory(synced);
       }
     };
     sync();
-    const interval = setInterval(sync, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -181,7 +188,22 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   // Render Logic
   switch (subView) {
     case NiftySubView.HUB:
-      return <NiftyHub onBack={onBack} onNavigate={(v: any) => setSubView(v)} onUserSelect={handleUserSelect} isMarketOpenDay={isMarketOpenDay()} isBeforePickDeadline={isBeforePickDeadline()} isAfterMarketClose={isAfterMarketClose()} dateOverride={dateOverride} effectiveDate={getEffectiveDate()} isWeekend={isWeekend} isPublicHoliday={isPublicHoliday} hasPlayedToday={hasPlayedToday} isUserLocked={(u) => Number(localStorage.getItem(`pin_attempts_${u?.toLowerCase()}`) || '0') >= 3} />;
+      return (
+        <NiftyHub 
+          onBack={onBack} 
+          onNavigate={(v: any) => setSubView(v)} 
+          onUserSelect={handleUserSelect} 
+          isMarketOpenDay={isMarketOpenDay()} 
+          isBeforePickDeadline={isBeforePickDeadline()} 
+          isAfterMarketClose={isAfterMarketClose()} 
+          dateOverride={dateOverride} 
+          effectiveDate={getEffectiveDate()} 
+          isWeekend={isWeekend} 
+          isPublicHoliday={isPublicHoliday} 
+          hasPlayedToday={hasPlayedToday} 
+          isUserLocked={(u) => Number(localStorage.getItem(`pin_attempts_${u?.toLowerCase()}`) || '0') >= 3} 
+        />
+      );
     case NiftySubView.PIN_ENTRY:
       return <NiftyPinEntry selectedUser={selectedUser} onSuccess={() => setSubView(NiftySubView.PLAYER_SELECT)} onBack={() => setSubView(NiftySubView.HUB)} />;
     case NiftySubView.PLAYER_SELECT:
