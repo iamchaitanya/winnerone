@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { isMarketHoliday, getMarketHolidayName } from '../src/lib/holidayManager';
+import { isMarketHoliday, getHolidayDetail } from '../src/lib/holidayManager';
 import { fetchAllLiveReturns } from '../src/lib/stockFetcher';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
-import { useGameStore } from '../src/store/useGameStore'; // Added store import
+import { useGameStore } from '../src/store/useGameStore';
 
 // Import modular components
 import { NiftyHub } from '../src/components/nifty/NiftyHub';
@@ -16,7 +16,6 @@ import { NiftyHistory } from '../src/components/nifty/NiftyHistory';
 
 interface Nifty50ViewProps {
   onBack: () => void;
-  // settings and profiles removed from here
 }
 
 enum NiftySubView {
@@ -41,7 +40,6 @@ interface NiftySession {
 }
 
 export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
-  // Grab global state directly
   const settings = useGameStore((state) => state.settings);
   const profiles = useGameStore((state) => state.profiles);
 
@@ -115,7 +113,6 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     return niftyHistory.find(s => s.player === sibling && new Date(s.timestamp).toDateString() === today) || null;
   }, [niftyHistory, getEffectiveDate]);
 
-  // Handlers
   const handleUserSelect = (user: string) => {
     setSelectedUser(user);
     setSubView(isPinEntryEnabled ? NiftySubView.PIN_ENTRY : NiftySubView.PLAYER_SELECT);
@@ -137,19 +134,6 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
         stock_symbol: symbol 
       }]);
       if (error) throw error;
-
-      const newSession: NiftySession = {
-        id: Math.random().toString(36).substr(2, 9),
-        player_id: playerId,
-        player: selectedUser,
-        symbol,
-        stockReturn: 0,
-        earnings: 0,
-        timestamp: getEffectiveDate().getTime(),
-        isSettled: false
-      };
-
-      setNiftyHistory([newSession, ...niftyHistory]);
       setSubView(NiftySubView.RESULTS);
     } catch (err) {
       alert('Failed to save pick.');
@@ -158,14 +142,17 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     }
   };
 
+  // REPLACED: Single useEffect with Realtime Subscription
   useEffect(() => {
+    let isMounted = true;
+
     const sync = async () => {
       const { data } = await supabase
         .from('nifty_logs')
         .select('*')
         .order('date', { ascending: false });
         
-      if (data) {
+      if (data && isMounted) {
         const synced = data.map(db => ({
           id: db.id, 
           player_id: db.player_id,
@@ -179,7 +166,21 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
         setNiftyHistory(synced);
       }
     };
+
     sync();
+
+    // Realtime Channel
+    const channel = supabase
+      .channel('nifty_logs_live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'nifty_logs' }, () => {
+        sync();
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {
@@ -203,7 +204,6 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     return p ? p.is_locked : false;
   };
 
-  // Render Logic
   switch (subView) {
     case NiftySubView.HUB:
       return (

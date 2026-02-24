@@ -2,6 +2,7 @@ export enum ViewType {
   HOME = 'home',
   ADDITION = 'addition',
   NIFTY50 = 'nifty50',
+  SENSEX = 'sensex',
   DASHBOARD = 'dashboard',
   ADMIN = 'admin'
 }

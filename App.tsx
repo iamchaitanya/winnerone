@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { HomeView } from './views/HomeView';
 import { AdditionView } from './views/AdditionView';
 import { Nifty50View } from './views/Nifty50View';
+import { SensexView } from './views/SensexView';
 import { DashboardView } from './views/DashboardView';
 import { AdminView } from './views/AdminView';
 import { ViewType, AppSetting, Profile } from './src/types';
@@ -121,6 +122,8 @@ const App: React.FC = () => {
         return <AdditionView onBack={() => setCurrentView(ViewType.HOME)} />;
       case ViewType.NIFTY50:
         return <Nifty50View onBack={() => setCurrentView(ViewType.HOME)} />;
+      case ViewType.SENSEX:
+        return <SensexView onBack={() => setCurrentView(ViewType.HOME)} />;  
       case ViewType.DASHBOARD:
         return <DashboardView onBack={() => setCurrentView(ViewType.HOME)} />;
       case ViewType.ADMIN:
