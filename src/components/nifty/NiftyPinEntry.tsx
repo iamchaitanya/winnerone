@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Lock, ShieldAlert, Delete } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lock, ShieldAlert, Delete, Loader2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 interface NiftyPinEntryProps {
   selectedUser: string | null;
@@ -14,39 +15,66 @@ export const NiftyPinEntry: React.FC<NiftyPinEntryProps> = ({
 }) => {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [userStatus, setUserStatus] = useState<{ pin_attempts: number; is_locked: boolean } | null>(null);
 
-  // Localized Lockout Logic
-  const getUserAttempts = (user: string | null) => {
-    if (!user) return 0;
-    return Number(localStorage.getItem(`pin_attempts_${user.toLowerCase()}`) || '0');
+  // Fetch the latest lock status and attempts from Supabase
+  const fetchUserStatus = async () => {
+    if (!selectedUser) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('pin_attempts, is_locked')
+      .eq('player_name', selectedUser)
+      .single();
+
+    if (!error && data) {
+      setUserStatus(data);
+    }
+    setLoading(false);
   };
 
-  const isUserLocked = (user: string | null) => {
-    return getUserAttempts(user) >= 3;
-  };
+  useEffect(() => {
+    fetchUserStatus();
+  }, [selectedUser]);
 
-  const incrementAttempts = (user: string) => {
-    const key = `pin_attempts_${user.toLowerCase()}`;
-    const attempts = Number(localStorage.getItem(key) || '0') + 1;
-    localStorage.setItem(key, attempts.toString());
-    return attempts;
-  };
+  const verifyPin = async (pin: string) => {
+    if (!selectedUser) return;
 
-  const resetAttempts = (user: string) => {
-    localStorage.setItem(`pin_attempts_${user.toLowerCase()}`, '0');
-  };
+    // 1. Fetch current profile to check PIN and current attempts
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('id, pin, pin_attempts')
+      .eq('player_name', selectedUser)
+      .single();
 
-  const verifyPin = (pin: string) => {
-    const correctPin = selectedUser === 'Ayaan' 
-      ? (localStorage.getItem('pin_ayaan') || '123456') 
-      : (localStorage.getItem('pin_riyaan') || '654321');
-    
-    if (pin === correctPin) {
-      resetAttempts(selectedUser!);
+    if (error || !profile) return;
+
+    if (pin === profile.pin) {
+      // SUCCESS: Reset attempts in Supabase
+      await supabase
+        .from('profiles')
+        .update({ pin_attempts: 0, is_locked: false })
+        .eq('id', profile.id);
+      
       onSuccess();
     } else {
+      // FAILURE: Increment attempts and check for lockout
+      const newAttempts = (profile.pin_attempts || 0) + 1;
+      const shouldLock = newAttempts >= 3;
+
+      await supabase
+        .from('profiles')
+        .update({ 
+          pin_attempts: newAttempts, 
+          is_locked: shouldLock 
+        })
+        .eq('id', profile.id);
+
+      // Refresh local state to show updated attempts/lock
+      setUserStatus({ pin_attempts: newAttempts, is_locked: shouldLock });
+      
       setPinError(true);
-      incrementAttempts(selectedUser!);
       setTimeout(() => {
         setPinInput('');
         setPinError(false);
@@ -55,7 +83,7 @@ export const NiftyPinEntry: React.FC<NiftyPinEntryProps> = ({
   };
 
   const handlePinKey = (num: string) => {
-    if (isUserLocked(selectedUser) || pinError) return;
+    if (userStatus?.is_locked || pinError || loading) return;
     if (pinInput.length < 6) {
       const nextVal = pinInput + num;
       setPinInput(nextVal);
@@ -66,13 +94,21 @@ export const NiftyPinEntry: React.FC<NiftyPinEntryProps> = ({
   };
 
   const handlePinDelete = () => {
-    if (isUserLocked(selectedUser) || pinError) return;
+    if (userStatus?.is_locked || pinError) return;
     setPinInput(pinInput.slice(0, -1));
     setPinError(false);
   };
 
-  const locked = isUserLocked(selectedUser);
-  const attempts = getUserAttempts(selectedUser);
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin text-indigo-500" size={32} />
+      </div>
+    );
+  }
+
+  const locked = userStatus?.is_locked;
+  const attempts = userStatus?.pin_attempts || 0;
   const attemptsLeft = Math.max(0, 3 - attempts);
 
   return (

@@ -1,17 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ViewType } from '../src/types';
 import { PlusCircle, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart } from 'lucide-react';
-import { useGameStore } from '../src/store/useGameStore'; // Added store import
+import { useGameStore } from '../src/store/useGameStore'; 
+import { isMarketHoliday, getHolidayDetail } from '../src/lib/holidayManager';
 
 interface HomeViewProps {
   onNavigate: (view: ViewType) => void;
   isDarkMode: boolean;
   onToggleDark: () => void;
-  // settings prop removed from here
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onToggleDark }) => {
-  // Grab settings directly from the global store
   const settings = useGameStore((state) => state.settings);
   
   const [timeLeft, setTimeLeft] = useState<{ days: number, hours: number, minutes: number } | null>(null);
@@ -36,6 +35,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
     }
     return now;
   }, [settings.dateOverride]);
+
+  const marketStatus = useMemo(() => {
+    const effectiveDate = getEffectiveDate();
+    const dateString = effectiveDate.toISOString().split('T')[0];
+    const isClosed = isMarketHoliday(dateString);
+    const detail = getHolidayDetail(dateString);
+    return { isClosed, detail };
+  }, [getEffectiveDate]);
 
   useEffect(() => {
     const updateTimer = () => {
@@ -99,6 +106,15 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
             </div>
           )}
 
+          {/* Integrated Market Info */}
+          {!isGameEnded && marketStatus.isClosed && (
+            <div className="mt-4 px-4 py-1.5 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800/50 rounded-full">
+              <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">
+                {marketStatus.detail ? `${marketStatus.detail.name} (${marketStatus.detail.type})` : 'Market Closed'}
+              </p>
+            </div>
+          )}
+
           {isGameEnded && (
             <div className="px-4 py-1 bg-rose-500 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full shadow-lg shadow-rose-500/20">
               Season Finalized
@@ -151,13 +167,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                 : 'opacity-50 grayscale cursor-not-allowed'
               }`}
             >
-              <div className="flex items-center gap-6 w-full">
+              <div className="flex items-center gap-6 w-full text-left">
                 <div className={`p-4 rounded-2xl transition-transform ${settings.additionEnabled ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
                   <PlusCircle size={32} />
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">ADDITION</span>
                   {!settings.additionEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10}/> Disabled by Admin</span>}
+                  {settings.additionEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard & History</span>}
                 </div>
               </div>
             </button>
@@ -170,13 +187,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                 : 'opacity-50 grayscale cursor-not-allowed'
               }`}
             >
-              <div className="flex items-center gap-6 w-full">
+              <div className="flex items-center gap-6 w-full text-left">
                 <div className={`p-4 rounded-2xl transition-transform ${settings.niftyEnabled ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
                   <TrendingUp size={32} />
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">NIFTY 50</span>
                   {!settings.niftyEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10}/> Disabled by Admin</span>}
+                  {settings.niftyEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Check Picks & Logs</span>}
                 </div>
               </div>
             </button>
