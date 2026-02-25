@@ -32,6 +32,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
       'addition_date_override': 'dateOverride',
       'game_enabled_addition': 'additionEnabled',
       'game_enabled_nifty': 'niftyEnabled',
+      'game_enabled_sensex': 'sensexEnabled',
       'pin_entry_enabled': 'pinEntryEnabled'
     };
     
@@ -70,6 +71,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
   // Toggles using the new self-contained update handler
   const toggleAddition = () => handleUpdateSetting('game_enabled_addition', !settings.additionEnabled);
   const toggleNifty = () => handleUpdateSetting('game_enabled_nifty', !settings.niftyEnabled);
+  const toggleSensex = () => handleUpdateSetting('game_enabled_sensex', !settings.sensexEnabled);
   const togglePinEntry = () => handleUpdateSetting('pin_entry_enabled', !settings.pinEntryEnabled);
   const updateDateOverride = (val: string) => handleUpdateSetting('addition_date_override', val);
   const clearDateOverride = () => handleUpdateSetting('addition_date_override', null);
@@ -216,6 +218,12 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
                 {settings.niftyEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
               </button>
             </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+    <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Sensex Game</span>
+    <button onClick={toggleSensex}>
+      {settings.sensexEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+    </button>
+  </div>
           </div>
         </div>
 

@@ -7,6 +7,7 @@ interface GameState {
     dateOverride: string | null;
     additionEnabled: boolean;
     niftyEnabled: boolean;
+    sensexEnabled: boolean;
     pinEntryEnabled: boolean;
   };
   profiles: Profile[];
@@ -21,6 +22,7 @@ export const useGameStore = create<GameState>((set) => ({
     dateOverride: null,
     additionEnabled: true,
     niftyEnabled: true,
+    sensexEnabled: true,
     pinEntryEnabled: true,
   },
   profiles: [],

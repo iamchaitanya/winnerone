@@ -202,22 +202,38 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
 {/* ... inside the section tag in HomeView.tsx, below the Nifty 50 button ... */}
 
 <button 
-  onClick={() => onNavigate(ViewType.SENSEX)}
-  className="flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none hover:shadow-2xl hover:border-amber-200 dark:hover:border-amber-500/50 transition-all group active:scale-[0.98]"
+  onClick={() => settings.sensexEnabled && onNavigate(ViewType.SENSEX)}
+  className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${
+    settings.sensexEnabled 
+    ? 'hover:shadow-2xl hover:border-amber-200 dark:hover:border-amber-500/50 active:scale-[0.98]' 
+    : 'opacity-50 grayscale cursor-not-allowed'
+  }`}
 >
   <div className="flex items-center gap-6 w-full text-left">
-    <div className="p-4 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-2xl group-hover:scale-110 transition-transform">
+    <div className={`p-4 rounded-2xl transition-transform ${
+      settings.sensexEnabled 
+      ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 group-hover:scale-110' 
+      : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+    }`}>
       <TrendingUp size={32} />
     </div>
     <div className="flex flex-col items-start">
       <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">SENSEX</span>
-      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-        Up or Down Prediction
-      </span>
+      
+      {/* Follows Nifty 50 logic: No caption unless disabled or market is closed */}
+      {!settings.sensexEnabled && (
+        <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1">
+          <ShieldAlert size={10}/> Disabled by Admin
+        </span>
+      )}
+      {settings.sensexEnabled && marketStatus.isClosed && (
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+          Review Picks & Logs
+        </span>
+      )}
     </div>
   </div>
 </button>
-
 {/* ... followed by the Dashboard button ... */}
 
 

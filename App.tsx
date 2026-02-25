@@ -31,6 +31,7 @@ const App: React.FC = () => {
       dateOverride: map['addition_date_override'] as string || null,
       additionEnabled: map['game_enabled_addition'] !== false,
       niftyEnabled: map['game_enabled_nifty'] !== false,
+      sensexEnabled: map['game_enabled_sensex'] !== false,
       pinEntryEnabled: map['pin_entry_enabled'] !== false,
     };
   }, []);
@@ -67,6 +68,7 @@ const App: React.FC = () => {
               'addition_date_override': 'dateOverride',
               'game_enabled_addition': 'additionEnabled',
               'game_enabled_nifty': 'niftyEnabled',
+              'game_enabled_sensex': 'sensexEnabled',
               'pin_entry_enabled': 'pinEntryEnabled'
             };
             const storeKey = keyMap[updatedRow.key];

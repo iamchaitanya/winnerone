@@ -21,7 +21,7 @@ export interface StockData {
  */
 
 export interface AppSetting {
-  key: 'addition_date_override' | 'game_enabled_addition' | 'game_enabled_nifty' | 'pin_entry_enabled';
+  key: 'addition_date_override' | 'game_enabled_addition' | 'game_enabled_nifty' | 'game_enabled_sensex'| 'pin_entry_enabled';
   value: string | boolean | null;
 }
 

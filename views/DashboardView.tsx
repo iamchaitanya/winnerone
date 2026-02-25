@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, User, Users, Trophy, Crown, RefreshCw, Zap } from 'lucide-react';
+import { ArrowLeft, User, Users, Trophy, Crown, RefreshCw } from 'lucide-react';
 import { supabase } from '../src/lib/supabase';
 
 interface PlayerScoreSummary {
@@ -7,6 +7,7 @@ interface PlayerScoreSummary {
   player_name: string;
   addition_total: number;
   nifty_total: number;
+  sensex_total: number; // Added
   grand_total: number;
 }
 
@@ -21,6 +22,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
   const [riyaanAddition, setRiyaanAddition] = useState(0);
   const [ayaanNifty, setAyaanNifty] = useState(0);
   const [riyaanNifty, setRiyaanNifty] = useState(0);
+  const [ayaanSensex, setAyaanSensex] = useState(0); // Added
+  const [riyaanSensex, setRiyaanSensex] = useState(0); // Added
 
   const fetchScores = useCallback(async () => {
     setLoading(true);
@@ -33,20 +36,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
       if (error) throw error;
 
       if (data) {
-        const ayaan = data.find(p => p.player_name === 'Ayaan');
-        const riyaan = data.find(p => p.player_name === 'Riyaan');
+        // Find players using IDs for better accuracy
+        const ayaan = data.find(p => p.player_id === '1d443035-34de-488f-a546-81116f0cd9a4');
+        const riyaan = data.find(p => p.player_id === 'e747e862-c03f-4c3a-8631-0236c172e36c');
 
         if (ayaan) {
           setAyaanAddition(ayaan.addition_total);
           setAyaanNifty(ayaan.nifty_total);
+          setAyaanSensex(ayaan.sensex_total || 0);
         }
         if (riyaan) {
           setRiyaanAddition(riyaan.addition_total);
           setRiyaanNifty(riyaan.nifty_total);
+          setRiyaanSensex(riyaan.sensex_total || 0);
         }
       }
     } catch (error) {
-      console.error('Error fetching optimized scores:', error);
+      console.error('Error fetching scores:', error);
     } finally {
       setLoading(false);
     }
@@ -56,21 +62,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
     fetchScores();
   }, [fetchScores]);
 
-  const ayaanTotal = ayaanAddition + ayaanNifty;
-  const riyaanTotal = riyaanAddition + riyaanNifty;
+  // Update total calculations to include Sensex
+  const ayaanTotal = ayaanAddition + ayaanNifty + ayaanSensex;
+  const riyaanTotal = riyaanAddition + riyaanNifty + riyaanSensex;
   
-  // Leadership and Bonus Math
   const isAyaanLeading = ayaanTotal >= riyaanTotal;
   const leaderBaseTotal = isAyaanLeading ? ayaanTotal : riyaanTotal;
   const leaderName = isAyaanLeading ? 'Ayaan' : 'Riyaan';
   
-  // Apply 30% bonus only if they actually have a positive score
   const leaderBonus = leaderBaseTotal > 0 ? leaderBaseTotal * 0.3 : 0;
   const leaderTotalWithBonus = leaderBaseTotal + leaderBonus;
   
-  // Recalculate grand total for the progress bar to include the newly minted bonus money
-  const adjustedGrandTotal = Math.abs(ayaanTotal) + Math.abs(riyaanTotal) + leaderBonus;
-
   const formatCurrency = (value: number) => 
     `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -97,45 +99,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
       </header>
 
       <div className="p-6 space-y-6 max-w-4xl mx-auto">
-        
-{/* Season Leader Section */}
-<div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-10 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden group">
-  
-  {/* Half-Visible Circular Badge */}
-  {leaderBonus > 0 && (
-    <div className="absolute -top-6 -right-6 w-28 h-28 bg-amber-400 text-indigo-950 rounded-full flex items-center justify-center shadow-2xl z-20 border-[12px] border-white/10">
-      <div className="mr-4 mt-4">
-        <span className="text-3xl font-black leading-none tracking-tighter">1.3x</span>
-      </div>
-    </div>
-  )}
+        {/* Season Leader Card */}
+        <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-10 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden group">
+          {leaderBonus > 0 && (
+            <div className="absolute -top-6 -right-6 w-28 h-28 bg-amber-400 text-indigo-950 rounded-full flex items-center justify-center shadow-2xl z-20 border-[12px] border-white/10">
+              <div className="mr-4 mt-4">
+                <span className="text-3xl font-black leading-none tracking-tighter">1.3x</span>
+              </div>
+            </div>
+          )}
+          <div className="absolute top-0 left-0 p-8 opacity-5 scale-125">
+            <Trophy size={100} />
+          </div>
+          <div className="relative z-10 flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-white/10 backdrop-blur-xl rounded-2xl flex items-center justify-center border border-white/20 mb-4 shadow-inner">
+              <Crown size={32} className="text-amber-300" />
+            </div>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.4em] mb-2 opacity-60">Season Leader</h4>
+            <p className="text-4xl font-black tracking-tighter uppercase mb-4">{leaderName}</p>
+            <div className="relative">
+              <p className="text-6xl font-black tabular-nums tracking-tight text-amber-300 drop-shadow-2xl">
+                {formatCurrency(leaderTotalWithBonus)}
+              </p>
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-24 h-1 bg-amber-400/30 rounded-full blur-sm"></div>
+            </div>
+          </div>
+        </div>
 
-  <div className="absolute top-0 left-0 p-8 opacity-5 scale-125">
-    <Trophy size={100} />
-  </div>
-  
-  <div className="relative z-10 flex flex-col items-center text-center">
-    <div className="w-16 h-16 bg-white/10 backdrop-blur-xl rounded-2xl flex items-center justify-center border border-white/20 mb-4 shadow-inner">
-      <Crown size={32} className="text-amber-300" />
-    </div>
-    
-    <h4 className="text-[10px] font-black uppercase tracking-[0.4em] mb-2 opacity-60">Season Leader</h4>
-    
-    <p className="text-4xl font-black tracking-tighter uppercase mb-4">
-      {leaderName}
-    </p>
-    
-    {/* Centered Large Amount */}
-    <div className="relative">
-      <p className="text-6xl font-black tabular-nums tracking-tight text-amber-300 drop-shadow-2xl">
-        {formatCurrency(leaderTotalWithBonus)}
-      </p>
-      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-24 h-1 bg-amber-400/30 rounded-full blur-sm"></div>
-    </div>
-  </div>
-</div>
-
-        {/* Individual Cards Grid */}
+        {/* Portfolio Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Ayaan Card */}
           <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl relative overflow-hidden group">
@@ -148,7 +139,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                 {formatCurrency(ayaanTotal)}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 grid-rows-2 gap-3"> {/* Changed to 3 columns */}
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Addition</p>
                 <p className={`text-sm font-black ${ayaanAddition < 0 ? 'text-rose-500' : 'text-indigo-600 dark:text-indigo-400'}`}>
@@ -159,6 +150,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50</p>
                 <p className={`text-sm font-black ${ayaanNifty < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   {formatCurrency(ayaanNifty)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Sensex</p>
+                <p className={`text-sm font-black ${ayaanSensex < 0 ? 'text-rose-500' : 'text-orange-600 dark:text-orange-400'}`}>
+                  {formatCurrency(ayaanSensex)}
                 </p>
               </div>
             </div>
@@ -175,7 +172,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                 {formatCurrency(riyaanTotal)}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 grid-rows-2 gap-3"> {/* Changed to 3 columns */}
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Addition</p>
                 <p className={`text-sm font-black ${riyaanAddition < 0 ? 'text-rose-500' : 'text-rose-600 dark:text-rose-400'}`}>
@@ -188,10 +185,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                   {formatCurrency(riyaanNifty)}
                 </p>
               </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Sensex</p>
+                <p className={`text-sm font-black ${riyaanSensex < 0 ? 'text-rose-500' : 'text-orange-600 dark:text-orange-400'}`}>
+                  {formatCurrency(riyaanSensex)}
+                </p>
+              </div>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
