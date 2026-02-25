@@ -81,10 +81,10 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const [subView, setSubView] = useState<AdditionSubView>(AdditionSubView.HUB);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [historyFilter, setHistoryFilter] = useState<'Ayaan' | 'Riyaan'>('Ayaan');
-  
+
   const dateOverride = settings.dateOverride;
   const isPinEntryEnabled = settings.pinEntryEnabled;
-  const isSubmittingRef = useRef(false); 
+  const isSubmittingRef = useRef(false);
 
   const [ayaanTotal, setAyaanTotal] = useState<number>(0);
   const [riyaanTotal, setRiyaanTotal] = useState<number>(0);
@@ -110,7 +110,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
 
     let aTotal = 0;
     let rTotal = 0;
-    
+
     const cloudHistory: GameSession[] = data.map((log: any) => {
       const pName = log.player_id === PLAYER_IDS.Ayaan ? 'Ayaan' : 'Riyaan';
       if (pName === 'Ayaan') aTotal += log.earnings;
@@ -134,7 +134,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
 
   useEffect(() => {
     syncWithCloud();
-    
+
     // Real-time updates like Nifty
     const channel = supabase
       .channel('addition_logs_live')
@@ -169,7 +169,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     const d = getEffectiveDate();
     const day = d.getDay();
     const isWknd = day === 0 || day === 6;
-    const isHoliday = isMarketHoliday(d.toISOString().split('T')[0]);
+    const isHoliday = isMarketHoliday(getISTDateKey(d));
     return !isWknd && !isHoliday;
   }, [getEffectiveDate]);
 
@@ -190,7 +190,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const finishQuiz = useCallback(async (fScore: number, fWrong: number, fResults: QuestionResult[]) => {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
-    
+
     const earnings = fScore - fWrong;
     setFinalScore(fScore);
     setFinalWrong(fWrong);
@@ -198,11 +198,11 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     setSessionResults(fResults);
 
     const effectiveTime = getEffectiveDate().getTime();
-    
+
     if (selectedUser) {
       const userProfile = getUserProfile(selectedUser);
       const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
-      
+
       // Save with a strict ISO string to avoid shifting
       await supabase.from('addition_logs').insert({
         player_id: playerId,
@@ -215,7 +215,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     }
 
     setSubView(AdditionSubView.RESULTS);
-    isSubmittingRef.current = false; 
+    isSubmittingRef.current = false;
   }, [selectedUser, getEffectiveDate, getUserProfile]);
 
   const {
@@ -231,13 +231,13 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const startQuiz = () => {
     if (!isMarketOpenDay()) return alert("Market closed!");
     if (hasPlayedToday(selectedUser)) return alert("Already played today!");
-    
+
     // Crash Protection (Internal only, doesn't block status display)
     if (selectedUser) {
       const todayIST = getISTDateKey(getEffectiveDate());
       localStorage.setItem(`addition_attempt_${selectedUser}_${todayIST}`, 'started');
     }
-    
+
     triggerEngineStart();
     setSubView(AdditionSubView.QUIZ);
   };
@@ -253,12 +253,12 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
       await supabase.from('profiles').update({ pin_attempts: 0 }).eq('id', profile.id);
       return true;
     }
-    
+
     const nextAttempts = (profile.pin_attempts || 0) + 1;
     const updates: any = { pin_attempts: nextAttempts };
     if (nextAttempts >= 3) updates.is_locked = true;
     await supabase.from('profiles').update(updates).eq('id', profile.id);
-    
+
     return false;
   };
 
@@ -295,7 +295,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   // View Switch
   switch (subView) {
     case AdditionSubView.HUB:
-      return <AdditionHub onBack={onBack} onNavigate={(v) => setSubView(v as AdditionSubView)} onUserSelect={(u) => { setSelectedUser(u); setSubView(isPinEntryEnabled ? AdditionSubView.PIN_ENTRY : AdditionSubView.PRE_ENTRY); }} isMarketWorkingDay={isMarketOpenDay()} dateOverride={dateOverride} isWeekend={getEffectiveDate().getDay() === 0 || getEffectiveDate().getDay() === 6} isPublicHoliday={isMarketHoliday(getEffectiveDate().toISOString().split('T')[0])} hasPlayedToday={hasPlayedToday} isUserLocked={isUserLocked} />;
+      return <AdditionHub onBack={onBack} onNavigate={(v) => setSubView(v as AdditionSubView)} onUserSelect={(u) => { setSelectedUser(u); setSubView(isPinEntryEnabled ? AdditionSubView.PIN_ENTRY : AdditionSubView.PRE_ENTRY); }} isMarketWorkingDay={isMarketOpenDay()} dateOverride={dateOverride} isWeekend={getEffectiveDate().getDay() === 0 || getEffectiveDate().getDay() === 6} isPublicHoliday={isMarketHoliday(getISTDateKey(getEffectiveDate()))} hasPlayedToday={hasPlayedToday} isUserLocked={isUserLocked} />;
     case AdditionSubView.PIN_ENTRY:
       return <AdditionPinEntry selectedUser={selectedUser} isLocked={isUserLocked(selectedUser)} attempts={getUserAttempts(selectedUser)} onVerify={handleVerifyPin} onSuccess={() => setSubView(AdditionSubView.PRE_ENTRY)} onBack={() => setSubView(AdditionSubView.HUB)} />;
     case AdditionSubView.PRE_ENTRY:

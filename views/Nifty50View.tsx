@@ -55,13 +55,13 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   const [niftyHistory, setNiftyHistory] = useState<NiftySession[]>([]);
 
   // Score Calculations
-  const ayaanNiftyTotal = useMemo(() => 
+  const ayaanNiftyTotal = useMemo(() =>
     niftyHistory.filter(s => s.player === 'Ayaan' && s.isSettled).reduce((t, s) => t + (s.earnings || 0), 0)
-  , [niftyHistory]);
+    , [niftyHistory]);
 
-  const riyaanNiftyTotal = useMemo(() => 
+  const riyaanNiftyTotal = useMemo(() =>
     niftyHistory.filter(s => s.player === 'Riyaan' && s.isSettled).reduce((t, s) => t + (s.earnings || 0), 0)
-  , [niftyHistory]);
+    , [niftyHistory]);
 
   // Market Timing Helpers
   const getEffectiveDate = useCallback(() => {
@@ -82,14 +82,15 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   }, [dateOverride]);
 
   const isWeekend = (date: Date) => date.getDay() === 0 || date.getDay() === 6;
-  const isPublicHoliday = (date: Date) => isMarketHoliday(date.toISOString().split('T')[0]);
+  const getISTDateKey = (date: Date | number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date));
+  const isPublicHoliday = (date: Date) => isMarketHoliday(getISTDateKey(date));
   const isMarketOpenDay = useCallback(() => {
     const d = getEffectiveDate();
     return !isWeekend(d) && !isPublicHoliday(d);
   }, [getEffectiveDate]);
 
   const isBeforePickDeadline = useCallback(() => getEffectiveDate().getHours() < 9 && isMarketOpenDay(), [getEffectiveDate, isMarketOpenDay]);
-  
+
   const isAfterMarketClose = useCallback(() => {
     if (!isMarketOpenDay()) return false;
     const d = getEffectiveDate();
@@ -121,17 +122,17 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   const handleStockPick = async (symbol: string) => {
     if (isSubmitting || !isBeforePickDeadline() || !selectedUser) return;
     setIsSubmitting(true);
-    const todayStr = getEffectiveDate().toISOString().split('T')[0];
+    const todayStr = getISTDateKey(getEffectiveDate());
 
     const userProfile = profiles.find(p => p.player_name === selectedUser);
     const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
 
     try {
-      const { error } = await supabase.from('nifty_logs').insert([{ 
-        date: todayStr, 
+      const { error } = await supabase.from('nifty_logs').insert([{
+        date: todayStr,
         player_id: playerId,
-        player: selectedUser, 
-        stock_symbol: symbol 
+        player: selectedUser,
+        stock_symbol: symbol
       }]);
       if (error) throw error;
       setSubView(NiftySubView.RESULTS);
@@ -151,16 +152,16 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
         .from('nifty_logs')
         .select('*')
         .order('date', { ascending: false });
-        
+
       if (data && isMounted) {
         const synced = data.map(db => ({
-          id: db.id, 
+          id: db.id,
           player_id: db.player_id,
-          player: db.player, 
+          player: db.player,
           symbol: db.stock_symbol,
-          stockReturn: db.stock_return || 0, 
+          stockReturn: db.stock_return || 0,
           earnings: db.earnings || 0,
-          timestamp: new Date(db.created_at).getTime(), 
+          timestamp: new Date(db.created_at).getTime(),
           isSettled: db.stock_return !== null
         }));
         setNiftyHistory(synced);
@@ -207,19 +208,19 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   switch (subView) {
     case NiftySubView.HUB:
       return (
-        <NiftyHub 
-          onBack={onBack} 
-          onNavigate={(v: any) => setSubView(v)} 
-          onUserSelect={handleUserSelect} 
-          isMarketOpenDay={isMarketOpenDay()} 
-          isBeforePickDeadline={isBeforePickDeadline()} 
-          isAfterMarketClose={isAfterMarketClose()} 
-          dateOverride={dateOverride} 
-          effectiveDate={getEffectiveDate()} 
-          isWeekend={isWeekend} 
-          isPublicHoliday={isPublicHoliday} 
-          hasPlayedToday={hasPlayedToday} 
-          isUserLocked={isUserLocked} 
+        <NiftyHub
+          onBack={onBack}
+          onNavigate={(v: any) => setSubView(v)}
+          onUserSelect={handleUserSelect}
+          isMarketOpenDay={isMarketOpenDay()}
+          isBeforePickDeadline={isBeforePickDeadline()}
+          isAfterMarketClose={isAfterMarketClose()}
+          dateOverride={dateOverride}
+          effectiveDate={getEffectiveDate()}
+          isWeekend={isWeekend}
+          isPublicHoliday={isPublicHoliday}
+          hasPlayedToday={hasPlayedToday}
+          isUserLocked={isUserLocked}
         />
       );
     case NiftySubView.PIN_ENTRY:
