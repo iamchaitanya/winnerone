@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { isMarketHoliday } from '../src/lib/holidayManager';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
-import { useGameStore } from '../src/store/useGameStore'; // Added store import
+import { useGameStore } from '../src/store/useGameStore';
 
 // Hook Import
 import { useAdditionEngine } from '../src/hooks/useAdditionEngine';
@@ -64,8 +64,17 @@ interface DailyRecord {
   riyaanTime: string | null;
 }
 
+// 🌐 Helper: Strict IST Date Key (YYYY-MM-DD)
+const getISTDateKey = (date: Date | number) => {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date(date));
+};
+
 export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
-  // Grab global state directly from Zustand
   const settings = useGameStore((state) => state.settings);
   const profiles = useGameStore((state) => state.profiles);
 
@@ -73,12 +82,10 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [historyFilter, setHistoryFilter] = useState<'Ayaan' | 'Riyaan'>('Ayaan');
   
-  // Settings & Timing (Now powered by Store)
   const dateOverride = settings.dateOverride;
   const isPinEntryEnabled = settings.pinEntryEnabled;
   const isSubmittingRef = useRef(false); 
 
-  // Persistent & Local Results State
   const [ayaanTotal, setAyaanTotal] = useState<number>(0);
   const [riyaanTotal, setRiyaanTotal] = useState<number>(0);
   const [history, setHistory] = useState<GameSession[]>([]);
@@ -87,51 +94,60 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const [finalScore, setFinalScore] = useState(0);
   const [finalWrong, setFinalWrong] = useState(0);
 
-  // Helper to safely get profile
   const getUserProfile = useCallback((name: string | null) => {
     return profiles.find(p => p.player_name === name);
   }, [profiles]);
 
-  // ☁️ Cloud Sync on Mount
-  useEffect(() => {
-    const syncWithCloud = async () => {
-      const { data, error } = await supabase
-        .from('addition_logs')
-        .select('*')
-        .order('played_at', { ascending: false })
-        .limit(500);
+  // ☁️ Cloud Sync (Consistent with Nifty/Sensex sync patterns)
+  const syncWithCloud = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('addition_logs')
+      .select('*')
+      .order('played_at', { ascending: false })
+      .limit(500);
 
-      if (error || !data) return;
+    if (error || !data) return;
 
-      let aTotal = 0;
-      let rTotal = 0;
-      
-      const cloudHistory: GameSession[] = data.map((log: any) => {
-        // Map DB UUID back to UI name safely
-        const pName = log.player_id === PLAYER_IDS.Ayaan ? 'Ayaan' : 'Riyaan';
-        if (pName === 'Ayaan') aTotal += log.earnings;
-        if (pName === 'Riyaan') rTotal += log.earnings;
+    let aTotal = 0;
+    let rTotal = 0;
+    
+    const cloudHistory: GameSession[] = data.map((log: any) => {
+      const pName = log.player_id === PLAYER_IDS.Ayaan ? 'Ayaan' : 'Riyaan';
+      if (pName === 'Ayaan') aTotal += log.earnings;
+      if (pName === 'Riyaan') rTotal += log.earnings;
 
-        return {
-          id: log.id,
-          player: pName,
-          score: log.score,
-          wrong: log.wrong_count,
-          earnings: log.earnings,
-          timestamp: new Date(log.played_at).getTime(),
-          results: log.details
-        };
-      });
+      return {
+        id: log.id,
+        player: pName,
+        score: log.score,
+        wrong: log.wrong_count,
+        earnings: log.earnings,
+        timestamp: new Date(log.played_at).getTime(),
+        results: log.details
+      };
+    });
 
-      setAyaanTotal(aTotal);
-      setRiyaanTotal(rTotal);
-      setHistory(cloudHistory);
-    };
-
-    syncWithCloud();
+    setAyaanTotal(aTotal);
+    setRiyaanTotal(rTotal);
+    setHistory(cloudHistory);
   }, []);
 
-  // 🛠️ Date & Market Helpers
+  useEffect(() => {
+    syncWithCloud();
+    
+    // Real-time updates like Nifty
+    const channel = supabase
+      .channel('addition_logs_live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'addition_logs' }, () => {
+        syncWithCloud();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [syncWithCloud]);
+
   const getEffectiveDate = useCallback(() => {
     if (dateOverride) {
       const d = new Date(dateOverride);
@@ -157,18 +173,17 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     return !isWknd && !isHoliday;
   }, [getEffectiveDate]);
 
+  // 🛡️ Consistent Logic: Check ONLY History (Removes localStorage lock)
   const hasPlayedToday = useCallback((player: string | null) => {
     if (!player) return false;
-    const today = getEffectiveDate().toDateString();
-    const inHistory = history.some(s => s.player === player && new Date(s.timestamp).toDateString() === today);
-    const attemptKey = `addition_attempt_${player}_${today}`; // Keeping local attempt key for immediate crash protection
-    return inHistory || localStorage.getItem(attemptKey) === 'started';
+    const todayIST = getISTDateKey(getEffectiveDate());
+    return history.some(s => s.player === player && getISTDateKey(s.timestamp) === todayIST);
   }, [history, getEffectiveDate]);
 
   const getTodaySession = useCallback((player: string | null) => {
     if (!player) return null;
-    const today = getEffectiveDate().toDateString();
-    return history.find(s => s.player === player && new Date(s.timestamp).toDateString() === today);
+    const todayIST = getISTDateKey(getEffectiveDate());
+    return history.find(s => s.player === player && getISTDateKey(s.timestamp) === todayIST) || null;
   }, [history, getEffectiveDate]);
 
   // 🏁 Finish Logic
@@ -182,27 +197,15 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     setFinalSessionEarnings(earnings);
     setSessionResults(fResults);
 
-    if (selectedUser === 'Ayaan') setAyaanTotal(prev => prev + earnings);
-    else if (selectedUser === 'Riyaan') setRiyaanTotal(prev => prev + earnings);
-
     const effectiveTime = getEffectiveDate().getTime();
-    const newSession: GameSession = {
-      id: 'temp-' + Date.now(),
-      player: selectedUser || 'Unknown',
-      score: fScore,
-      wrong: fWrong,
-      earnings,
-      timestamp: effectiveTime,
-      results: fResults
-    };
-    setHistory(prev => [newSession, ...prev].slice(0, 500));
-
+    
     if (selectedUser) {
       const userProfile = getUserProfile(selectedUser);
       const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
       
+      // Save with a strict ISO string to avoid shifting
       await supabase.from('addition_logs').insert({
-        player_id: playerId, // Now using strict UUIDs
+        player_id: playerId,
         score: fScore,
         wrong_count: fWrong,
         earnings,
@@ -215,7 +218,6 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     isSubmittingRef.current = false; 
   }, [selectedUser, getEffectiveDate, getUserProfile]);
 
-  // 🧠 Addition Engine Hook
   const {
     questions,
     currentIndex,
@@ -230,14 +232,16 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     if (!isMarketOpenDay()) return alert("Market closed!");
     if (hasPlayedToday(selectedUser)) return alert("Already played today!");
     
+    // Crash Protection (Internal only, doesn't block status display)
     if (selectedUser) {
-        localStorage.setItem(`addition_attempt_${selectedUser}_${getEffectiveDate().toDateString()}`, 'started');
+      const todayIST = getISTDateKey(getEffectiveDate());
+      localStorage.setItem(`addition_attempt_${selectedUser}_${todayIST}`, 'started');
     }
+    
     triggerEngineStart();
     setSubView(AdditionSubView.QUIZ);
   };
 
-  // 🔐 PIN Logic Powered by Cloud Profiles
   const getUserAttempts = (user: string | null) => getUserProfile(user)?.pin_attempts || 0;
   const isUserLocked = (user: string | null) => getUserProfile(user)?.is_locked || false;
 
@@ -246,12 +250,10 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     if (!profile) return false;
 
     if (pin === profile.pin) {
-      // Reset attempts in the cloud upon success
       await supabase.from('profiles').update({ pin_attempts: 0 }).eq('id', profile.id);
       return true;
     }
     
-    // Increment attempts in the cloud upon failure
     const nextAttempts = (profile.pin_attempts || 0) + 1;
     const updates: any = { pin_attempts: nextAttempts };
     if (nextAttempts >= 3) updates.is_locked = true;
@@ -260,26 +262,25 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     return false;
   };
 
-  // 📊 Data Aggregation
   const groupedHistory = useMemo(() => {
     const groups: Record<string, DailyRecord> = {};
     history.forEach(session => {
-      const dateObj = new Date(session.timestamp);
-      const dateKey = dateObj.toDateString();
+      const dateKey = getISTDateKey(session.timestamp);
       if (!groups[dateKey]) {
+        const dateObj = new Date(session.timestamp);
         groups[dateKey] = {
           dateKey,
-          displayDate: dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+          displayDate: dateObj.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric' }),
           timestamp: session.timestamp,
           ayaanEarnings: null, ayaanTime: null, riyaanEarnings: null, riyaanTime: null,
         };
       }
       if (session.player === 'Ayaan') {
         groups[dateKey].ayaanEarnings = (groups[dateKey].ayaanEarnings || 0) + session.earnings;
-        groups[dateKey].ayaanTime = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        groups[dateKey].ayaanTime = new Date(session.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
       } else {
         groups[dateKey].riyaanEarnings = (groups[dateKey].riyaanEarnings || 0) + session.earnings;
-        groups[dateKey].riyaanTime = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        groups[dateKey].riyaanTime = new Date(session.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
       }
     });
     return Object.values(groups).sort((a, b) => b.timestamp - a.timestamp);
@@ -291,7 +292,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     return all.filter(q => q.player === historyFilter).sort((a, b) => b.timestamp - a.timestamp);
   }, [history, historyFilter]);
 
-  // 📺 View Switch
+  // View Switch
   switch (subView) {
     case AdditionSubView.HUB:
       return <AdditionHub onBack={onBack} onNavigate={(v) => setSubView(v as AdditionSubView)} onUserSelect={(u) => { setSelectedUser(u); setSubView(isPinEntryEnabled ? AdditionSubView.PIN_ENTRY : AdditionSubView.PRE_ENTRY); }} isMarketWorkingDay={isMarketOpenDay()} dateOverride={dateOverride} isWeekend={getEffectiveDate().getDay() === 0 || getEffectiveDate().getDay() === 6} isPublicHoliday={isMarketHoliday(getEffectiveDate().toISOString().split('T')[0])} hasPlayedToday={hasPlayedToday} isUserLocked={isUserLocked} />;

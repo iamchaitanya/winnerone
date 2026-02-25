@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, User, Users, BarChart2, History, Check, Lock, CalendarX, Clock } from 'lucide-react';
+import { ArrowLeft, User, Users, BarChart2, History, Check, Lock, CalendarX, Clock, Bug } from 'lucide-react';
 
 interface AdditionHubProps {
   onBack: () => void;
@@ -11,6 +11,13 @@ interface AdditionHubProps {
   isPublicHoliday: boolean;
   hasPlayedToday: (user: string) => boolean;
   isUserLocked: (user: string) => boolean;
+  // New Debug Props
+  debugInfo?: {
+    effectiveDate: string;
+    istDateKey: string;
+    ayaanStatus: string;
+    riyaanStatus: string;
+  };
 }
 
 export const AdditionHub: React.FC<AdditionHubProps> = ({
@@ -22,14 +29,15 @@ export const AdditionHub: React.FC<AdditionHubProps> = ({
   isWeekend,
   isPublicHoliday,
   hasPlayedToday,
-  isUserLocked
+  isUserLocked,
+  debugInfo
 }) => {
   const ayaanPlayed = hasPlayedToday('Ayaan');
   const riyaanPlayed = hasPlayedToday('Riyaan');
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 animate-in fade-in duration-500">
-      <header className="flex items-center justify-between mb-12">
+      <header className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
             <ArrowLeft size={24} />
@@ -48,6 +56,26 @@ export const AdditionHub: React.FC<AdditionHubProps> = ({
         </div>
       </header>
       
+      {/* 🛠️ DEBUG BANNER */}
+      {debugInfo && (
+        <div className="mb-6 max-w-md mx-auto p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-2xl">
+          <div className="flex items-center gap-2 mb-2 text-amber-600 dark:text-amber-400">
+            <Bug size={14} />
+            <span className="text-[10px] font-black uppercase tracking-widest">System Debugger</span>
+          </div>
+          <div className="grid grid-cols-2 gap-y-2 text-[10px] font-mono">
+            <span className="text-slate-500">Effective Date:</span>
+            <span className="text-slate-900 dark:text-slate-200 text-right">{debugInfo.effectiveDate}</span>
+            <span className="text-slate-500">IST Date Key:</span>
+            <span className="text-slate-900 dark:text-slate-200 text-right">{debugInfo.istDateKey}</span>
+            <span className="text-slate-500">Ayaan Status:</span>
+            <span className={`${ayaanPlayed ? 'text-emerald-500' : 'text-rose-500'} text-right font-bold`}>{debugInfo.ayaanStatus}</span>
+            <span className="text-slate-500">Riyaan Status:</span>
+            <span className={`${riyaanPlayed ? 'text-emerald-500' : 'text-rose-500'} text-right font-bold`}>{debugInfo.riyaanStatus}</span>
+          </div>
+        </div>
+      )}
+
       {!isMarketWorkingDay && (
         <div className="mb-8 max-w-md mx-auto">
           <div className="p-5 rounded-[2rem] border bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-800/30 flex items-center gap-4 shadow-sm">
@@ -98,6 +126,7 @@ export const AdditionHub: React.FC<AdditionHubProps> = ({
             </div>
           </div>
         </button>
+        {/* Dashboard and History Buttons remain the same */}
         <button onClick={() => onNavigate('local_dashboard')} className="flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl hover:border-amber-400 transition-all active:scale-[0.98] group">
           <div className="flex items-center gap-6">
             <div className="p-4 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-2xl group-hover:scale-110 transition-transform"><BarChart2 size={32} /></div>
