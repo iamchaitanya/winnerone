@@ -4,19 +4,31 @@ export async function fetchAllLiveReturns(): Promise<Record<string, { price: num
   try {
     const response = await fetch(LIVE_CSV_URL);
     const csvText = await response.text();
-    const lines = csvText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     
+    // Robust regex to split CSV lines while ignoring commas inside quotes
+    const rows = csvText.split(/\r?\n/).filter(line => line.trim() !== "");
     const results: Record<string, { price: number, changesPercentage: number }> = {};
     
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(',');
-      if (cols.length >= 3) {
-        const symbol = cols[0].trim();
-        const price = parseFloat(cols[1].trim()); // Column 1 is Price
-        const change = parseFloat(cols[2].trim()); // Column 2 is % Change
+    // Skip header row
+    for (let i = 1; i < rows.length; i++) {
+      // This regex handles quoted fields like "72,500.00" correctly
+      const cols = rows[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+      
+      if (cols && cols.length >= 3) {
+        const symbol = cols[0].replace(/"/g, '').trim();
+        
+        // Remove quotes and commas before parsing the price and change
+        const rawPrice = cols[1].replace(/[",]/g, '').trim();
+        const rawChange = cols[2].replace(/[",]/g, '').trim();
+        
+        const price = parseFloat(rawPrice);
+        const change = parseFloat(rawChange);
         
         if (symbol) {
-          results[symbol] = { price: price || 0, changesPercentage: change || 0 };
+          results[symbol] = { 
+            price: isNaN(price) ? 0 : price, 
+            changesPercentage: isNaN(change) ? 0 : change 
+          };
         }
       }
     }

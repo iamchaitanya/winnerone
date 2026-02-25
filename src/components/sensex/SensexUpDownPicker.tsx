@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, TrendingUp, TrendingDown, ChevronUp, ChevronDown, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ArrowLeft, TrendingUp, TrendingDown, ChevronUp, ChevronDown, AlertCircle, Loader2, RotateCw } from 'lucide-react';
 import { fetchAllLiveReturns } from '../../lib/stockFetcher';
 
 interface SensexUpDownPickerProps {
@@ -17,25 +17,45 @@ export const SensexUpDownPicker: React.FC<SensexUpDownPickerProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
-    fetchAllLiveReturns()
-      .then(data => {
-        if (data['SENSEX']) setLiveData(data['SENSEX']);
-        setIsLoading(false);
-      })
-      .catch(() => {
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError(false);
+    try {
+      const data = await fetchAllLiveReturns();
+      // Ensure we match the exact key used in your CSV/Fetcher logic
+      if (data['SENSEX']) {
+        setLiveData(data['SENSEX']);
+      } else {
+        console.error('SENSEX key not found in live data:', Object.keys(data));
         setError(true);
-        setIsLoading(false);
-      });
+      }
+    } catch (err) {
+      setError(true);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 flex flex-col p-6 animate-in slide-in-from-bottom duration-300">
-      <header className="flex items-center gap-4 mb-8">
-        <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
-          <ArrowLeft size={24} />
+      <header className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white">
+            <ArrowLeft size={24} />
+          </button>
+          <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Sensex Prediction</h1>
+        </div>
+        <button 
+          onClick={loadData} 
+          disabled={isLoading}
+          className="p-2 text-slate-400 hover:text-indigo-500 transition-colors disabled:opacity-30"
+        >
+          <RotateCw size={20} className={isLoading ? 'animate-spin' : ''} />
         </button>
-        <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Sensex Prediction</h1>
       </header>
 
       <div className="flex-1 flex flex-col items-center justify-center -mt-12">
@@ -53,8 +73,8 @@ export const SensexUpDownPicker: React.FC<SensexUpDownPickerProps> = ({
             </div>
           ) : (
             <>
-              <h2 className="text-6xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">
-                {liveData.price.toLocaleString('en-IN')}
+              <h2 className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">
+                {liveData.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
               </h2>
               <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-black text-sm ${liveData.changesPercentage >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
                 {liveData.changesPercentage >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
@@ -74,7 +94,7 @@ export const SensexUpDownPicker: React.FC<SensexUpDownPickerProps> = ({
 
       <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto w-full mb-8">
         <button
-          disabled={isSubmitting || isLoading}
+          disabled={isSubmitting || isLoading || error}
           onClick={() => onPick('UP')}
           className="h-32 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 rounded-[2rem] flex flex-col items-center justify-center transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
         >
@@ -83,7 +103,7 @@ export const SensexUpDownPicker: React.FC<SensexUpDownPickerProps> = ({
         </button>
 
         <button
-          disabled={isSubmitting || isLoading}
+          disabled={isSubmitting || isLoading || error}
           onClick={() => onPick('DOWN')}
           className="h-32 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 rounded-[2rem] flex flex-col items-center justify-center transition-all active:scale-95 shadow-lg shadow-rose-500/20"
         >

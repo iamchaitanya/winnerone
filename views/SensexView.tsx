@@ -23,6 +23,11 @@ enum SensexSubView {
   HISTORY = 'history'
 }
 
+// Helper to get local YYYY-MM-DD regardless of UTC offset
+const getLocalDateString = (d: Date) => {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const settings = useGameStore((state) => state.settings);
   const profiles = useGameStore((state) => state.profiles);
@@ -35,7 +40,6 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   const dateOverride = settings.dateOverride;
 
-  // Market Timing Logic (Cloned from Nifty standard for exact consistency)
   const getEffectiveDate = useCallback(() => {
     const now = new Date();
     if (dateOverride) {
@@ -54,9 +58,10 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   }, [dateOverride]);
 
   const isWeekend = (date: Date) => date.getDay() === 0 || date.getDay() === 6;
+  
   const isMarketOpenDay = useCallback(() => {
     const d = getEffectiveDate();
-    return !isWeekend(d) && !isMarketHoliday(d.toISOString().split('T')[0]);
+    return !isWeekend(d) && !isMarketHoliday(getLocalDateString(d));
   }, [getEffectiveDate]);
 
   const isBeforePickDeadline = useCallback(() => getEffectiveDate().getHours() < 9 && isMarketOpenDay(), [getEffectiveDate, isMarketOpenDay]);
@@ -66,34 +71,26 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     return isMarketOpenDay() && (d.getHours() > 15 || (d.getHours() === 15 && d.getMinutes() >= 30));
   }, [getEffectiveDate, isMarketOpenDay]);
 
+  // FIX: Compare against the local date string to support dateOverride testing
   const hasPlayedToday = useCallback((player: string | null) => {
     if (!player) return false;
-    const today = getEffectiveDate().toDateString();
-    return sensexHistory.some(s => s.player === player && new Date(s.created_at).toDateString() === today);
+    const todayStr = getLocalDateString(getEffectiveDate());
+    return sensexHistory.some(s => s.player === player && s.date === todayStr);
   }, [sensexHistory, getEffectiveDate]);
 
-  // Realtime Data Sync
   useEffect(() => {
     let isMounted = true;
-
     const fetchLogs = async () => {
       const { data, error } = await supabase
         .from('sensex_logs')
         .select('*')
         .order('date', { ascending: false });
         
-      if (error) {
-        console.error('Error fetching Sensex logs:', error);
-        return;
-      }
-      
-      if (data && isMounted) {
-        setSensexHistory(data);
-      }
+      if (error) return;
+      if (data && isMounted) setSensexHistory(data);
     };
 
     fetchLogs();
-
     const channel = supabase
       .channel('sensex_logs_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sensex_logs' }, () => {
@@ -107,7 +104,6 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     };
   }, []);
 
-  // Leaderboard Calculations
   const ayaanTotal = useMemo(() => 
     sensexHistory.filter(s => s.player === 'Ayaan' && s.is_settled).reduce((t, s) => t + (Number(s.earnings) || 0), 0)
   , [sensexHistory]);
@@ -126,7 +122,6 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     return Object.values(groups).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [sensexHistory]);
 
-  // Handlers
   const handleUserSelect = (user: string) => {
     setSelectedUser(user);
     setSubView(settings.pinEntryEnabled ? SensexSubView.PIN_ENTRY : SensexSubView.PLAYER_SELECT);
@@ -137,7 +132,7 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     setIsSubmitting(true);
     setUserPrediction(prediction);
 
-    const todayStr = getEffectiveDate().toISOString().split('T')[0];
+    const todayStr = getLocalDateString(getEffectiveDate());
     const userProfile = profiles.find(p => p.player_name === selectedUser);
     const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
 
@@ -162,7 +157,6 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     return p ? p.is_locked : false;
   };
 
-  // Switch View Logic
   switch (subView) {
     case SensexSubView.HUB:
       return (
@@ -184,8 +178,17 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       return <SensexPlayerSelect selectedUser={selectedUser} isPlayed={hasPlayedToday(selectedUser)} isPickWindow={isBeforePickDeadline()} isMarketWorking={isMarketOpenDay()} onNavigate={(v: any) => setSubView(v === 'RESULTS' ? SensexSubView.RESULTS : SensexSubView.PICK)} onBack={() => setSubView(SensexSubView.HUB)} />;
     case SensexSubView.PICK:
       return <SensexUpDownPicker isSubmitting={isSubmitting} onPick={handlePickSubmit} onBack={() => setSubView(SensexSubView.PLAYER_SELECT)} />;
-    case SensexSubView.RESULTS:
-      return <SensexResults prediction={userPrediction || 'UP'} onContinue={() => { setUserPrediction(null); setSubView(SensexSubView.HUB); }} />;
+    case SensexSubView.RESULTS: {
+      // FIX: Recover prediction from history if local state is lost
+      const todayStr = getLocalDateString(getEffectiveDate());
+      const record = sensexHistory.find(s => s.player === selectedUser && s.date === todayStr);
+      return (
+        <SensexResults 
+          prediction={userPrediction || record?.prediction || 'UP'} 
+          onContinue={() => { setUserPrediction(null); setSubView(SensexSubView.HUB); }} 
+        />
+      );
+    }
     case SensexSubView.DASHBOARD:
       return <SensexLeaderboard ayaanTotal={ayaanTotal} riyaanTotal={riyaanTotal} groupedHistory={groupedHistory} onBack={() => setSubView(SensexSubView.HUB)} />;
     case SensexSubView.HISTORY:

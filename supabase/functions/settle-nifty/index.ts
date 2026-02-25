@@ -6,7 +6,9 @@ import { fetchStockData } from './stockDataFetcher.ts'
 
 /**
  * Helper to settle Sensex Predictions
- * Awarding ₹10 for correct predictions
+ * NEW LOGIC: 
+ * - Correct: Earnings = |Market Return| * 10
+ * - Incorrect: Earnings = -|Market Return| * 10
  */
 async function settleSensex(supabase: any, stockData: Record<string, number>) {
   console.log("Starting Sensex settlement...");
@@ -33,7 +35,10 @@ async function settleSensex(supabase: any, stockData: Record<string, number>) {
 
   for (const log of logs) {
     const isCorrect = log.prediction === actualDirection;
-    const earnings = isCorrect ? 10 : 0; 
+    
+    // High-stakes calculation: 10x the market movement magnitude
+    const magnitude = Math.abs(sensexReturn);
+    const earnings = parseFloat(((isCorrect ? 1 : -1) * magnitude * 10).toFixed(2));
 
     const { error: updateError } = await supabase
       .from('sensex_logs')
@@ -47,11 +52,21 @@ async function settleSensex(supabase: any, stockData: Record<string, number>) {
     if (updateError) console.error(`Failed to settle Sensex log ${log.id}:`, updateError);
   }
   
-  console.log(`Successfully settled ${logs.length} Sensex predictions.`);
+  console.log(`Successfully settled ${logs.length} Sensex predictions with dynamic returns.`);
 }
 
 Deno.serve(async (req) => {
   try {
+    // --- SECURITY CHECK ---
+    const secret = req.headers.get('x-webhook-secret');
+    if (secret !== 'my_super_secret_string_123') {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid secret" }), { 
+        status: 401, 
+        headers: { "Content-Type": "application/json" } 
+      });
+    }
+    // ----------------------
+
     // 1. Check for Market Holiday
     const shouldSkip = await isHolidayToday();
     if (shouldSkip) {
@@ -82,11 +97,9 @@ Deno.serve(async (req) => {
         const symbol = log.stock_symbol;
         const returnVal = stockData[symbol] || 0;
         
-        // Preservation of decimal precision
         const earnings = parseFloat((returnVal * 10).toFixed(2));
         const dateStr = log.date;
 
-        // Update User Log
         await supabase
           .from('nifty_logs')
           .update({ 
@@ -95,7 +108,6 @@ Deno.serve(async (req) => {
           })
           .eq('id', log.id);
 
-        // PRESERVED: Original History Upsert Logic
         await supabase
           .from('stock_history')
           .upsert({ 
@@ -105,18 +117,16 @@ Deno.serve(async (req) => {
           }, { onConflict: 'date,symbol' });
       }
       console.log(`Settled ${niftyLogs.length} Nifty 50 picks.`);
-    } else {
-      console.log("No pending Nifty 50 picks.");
     }
 
-    // 5. SETTLE SENSEX (New Parallel Logic)
+    // 5. SETTLE SENSEX (New Dynamic Logic)
     await settleSensex(supabase, stockData);
 
     return new Response(JSON.stringify({ 
       message: "Settlement process completed successfully for both games." 
     }), { headers: { "Content-Type": "application/json" } });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Critical error during settlement:", error.message);
     return new Response(JSON.stringify({ error: error.message }), { 
       status: 500, 
