@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo} from 'react';
 import { isMarketHoliday } from '../src/lib/holidayManager';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { useGameStore } from '../src/store/useGameStore';
+import { ArrowLeft } from 'lucide-react';
 
 // Modular Sensex Components
 import { SensexHub } from '../src/components/sensex/SensexHub';
@@ -184,15 +185,85 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       const record = sensexHistory.find(s => s.player === selectedUser && s.date === todayStr);
       return (
         <SensexResults 
-          prediction={userPrediction || record?.prediction || 'UP'} 
+          prediction={userPrediction || record?.prediction || 'UP'}
+          isSettled={record?.is_settled}          // Add this line
+          earnings={record?.earnings}             // Add this line
+          actualReturn={record?.actual_return}    // Add this line
+          closingValue={record?.closing_value} // Pass the new data here
           onContinue={() => { setUserPrediction(null); setSubView(SensexSubView.HUB); }} 
         />
       );
     }
     case SensexSubView.DASHBOARD:
       return <SensexLeaderboard ayaanTotal={ayaanTotal} riyaanTotal={riyaanTotal} groupedHistory={groupedHistory} onBack={() => setSubView(SensexSubView.HUB)} />;
-    case SensexSubView.HISTORY:
-      return <SensexHistory groupedHistory={groupedHistory} onBack={() => setSubView(SensexSubView.HUB)} />;
+      case SensexSubView.HISTORY:
+        return (
+          <div className="p-4 max-w-md mx-auto"> {/* Changed from 4xl to md for a tighter fit */}
+            <div className="flex items-center gap-3 mb-4">
+              <button onClick={() => setSubView(SensexSubView.HUB)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                <ArrowLeft size={20} className="text-slate-600 dark:text-slate-400" />
+              </button>
+              <h1 className="text-xl font-black text-slate-900 dark:text-white">Daily Performance</h1>
+            </div>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-lg border border-slate-100 dark:border-slate-800">
+              <SensexHistory groupedHistory={groupedHistory} />
+            </div>
+          </div>
+        );
+      return (
+        <div className="p-4 max-w-4xl mx-auto"> {/* Wider container for the table */}
+          <div className="flex items-center gap-4 mb-6">
+            <button 
+              onClick={() => setSubView(SensexSubView.HUB)}
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+            >
+              <ArrowLeft size={24} className="text-slate-600 dark:text-slate-400" />
+            </button>
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white">Daily Performance</h1>
+          </div>
+          
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800">
+            {/* Pass groupedHistory here */}
+            <SensexHistory groupedHistory={groupedHistory} />
+          </div>
+        </div>
+      );
+        return (
+          <div className="p-4 max-w-2xl mx-auto">
+            <div className="flex items-center gap-4 mb-6">
+              <button 
+                onClick={() => setSubView(SensexSubView.HUB)}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+              >
+                <ArrowLeft size={24} className="text-slate-600 dark:text-slate-400" />
+              </button>
+              <h1 className="text-2xl font-black text-slate-900 dark:text-white">Performance Log</h1>
+            </div>
+            
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800">
+              {/* Make sure this says 'history' and not 'groupedHistory' */}
+              <SensexHistory history={sensexHistory || []} />
+            </div>
+          </div>
+        );
+        return (
+          <div className="p-4 max-w-2xl mx-auto">
+            <div className="flex items-center gap-4 mb-6">
+              <button 
+                onClick={() => setSubView(SensexSubView.HUB)}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+              >
+                <ArrowLeft size={24} className="text-slate-600 dark:text-slate-400" />
+              </button>
+              <h1 className="text-2xl font-black text-slate-900 dark:text-white">Performance Log</h1>
+            </div>
+            
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800">
+              {/* FIX: Change prop name from groupedHistory to history */}
+              <SensexHistory history={sensexHistory || []} />
+            </div>
+          </div>
+        );
     default:
       return null;
   }

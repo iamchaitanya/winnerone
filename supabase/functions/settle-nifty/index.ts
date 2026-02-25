@@ -2,21 +2,20 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { isHolidayToday } from './holidayChecker.ts'
-import { fetchStockData } from './stockDataFetcher.ts'
+import { fetchStockData, StockInfo } from './stockDataFetcher.ts'
 
 /**
  * Helper to settle Sensex Predictions
- * NEW LOGIC: 
- * - Correct: Earnings = |Market Return| * 10
- * - Incorrect: Earnings = -|Market Return| * 10
  */
-async function settleSensex(supabase: any, stockData: Record<string, number>) {
+async function settleSensex(supabase: any, stockData: Record<string, StockInfo>) {
   console.log("Starting Sensex settlement...");
   
-  const sensexReturn = stockData['SENSEX'] || 0;
+  const sensexInfo = stockData['SENSEX'] || { percentage: 0, price: 0 };
+  const sensexReturn = sensexInfo.percentage;
+  const sensexClosingValue = sensexInfo.price;
   const actualDirection = sensexReturn >= 0 ? 'UP' : 'DOWN';
   
-  console.log(`Sensex today: ${sensexReturn}% (Direction: ${actualDirection})`);
+  console.log(`Sensex today: ${sensexReturn}% (Points: ${sensexClosingValue}, Direction: ${actualDirection})`);
 
   const { data: logs, error: fetchError } = await supabase
     .from('sensex_logs')
@@ -33,41 +32,45 @@ async function settleSensex(supabase: any, stockData: Record<string, number>) {
     return;
   }
 
-  for (const log of logs) {
+  const updatePromises = logs.map(log => {
     const isCorrect = log.prediction === actualDirection;
-    
-    // High-stakes calculation: 10x the market movement magnitude
     const magnitude = Math.abs(sensexReturn);
     const earnings = parseFloat(((isCorrect ? 1 : -1) * magnitude * 10).toFixed(2));
 
-    const { error: updateError } = await supabase
+    return supabase
       .from('sensex_logs')
       .update({ 
         actual_return: sensexReturn,
+        closing_value: sensexClosingValue, // Saves the actual index points
         earnings: earnings,
         is_settled: true 
       })
       .eq('id', log.id);
-      
-    if (updateError) console.error(`Failed to settle Sensex log ${log.id}:`, updateError);
-  }
+  });
+
+  const results = await Promise.all(updatePromises);
   
-  console.log(`Successfully settled ${logs.length} Sensex predictions with dynamic returns.`);
+  results.forEach((res, index) => {
+    if (res.error) console.error(`Failed to settle Sensex log ${logs[index].id}:`, res.error);
+  });
+  
+  console.log(`Successfully settled ${logs.length} Sensex predictions.`);
 }
 
 Deno.serve(async (req) => {
   try {
     // --- SECURITY CHECK ---
     const secret = req.headers.get('x-webhook-secret');
-    if (secret !== 'my_super_secret_string_123') {
-      return new Response(JSON.stringify({ error: "Unauthorized: Invalid secret" }), { 
+    const expectedSecret = Deno.env.get('WEBHOOK_SECRET');
+
+    if (!secret || secret !== expectedSecret) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing secret" }), { 
         status: 401, 
         headers: { "Content-Type": "application/json" } 
       });
     }
     // ----------------------
 
-    // 1. Check for Market Holiday
     const shouldSkip = await isHolidayToday();
     if (shouldSkip) {
       return new Response(JSON.stringify({ message: "Market closed. No settlement today." }), { 
@@ -75,15 +78,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Initialize Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 3. Fetch Live Data from Google Sheet
     const stockData = await fetchStockData();
 
-    // 4. SETTLE NIFTY 50 (Original Logic Preserved)
+    // 4. SETTLE NIFTY 50
     console.log("Starting Nifty 50 settlement...");
     const { data: niftyLogs, error: niftyFetchError } = await supabase
       .from('nifty_logs')
@@ -93,33 +94,43 @@ Deno.serve(async (req) => {
     if (niftyFetchError) throw niftyFetchError;
 
     if (niftyLogs && niftyLogs.length > 0) {
+      const updatePromises = [];
+      const uniqueHistory = new Map();
+
       for (const log of niftyLogs) {
         const symbol = log.stock_symbol;
-        const returnVal = stockData[symbol] || 0;
-        
+        const stockInfo = stockData[symbol] || { percentage: 0, price: 0 };
+        const returnVal = stockInfo.percentage; // Extracts the percentage from the new object
         const earnings = parseFloat((returnVal * 10).toFixed(2));
-        const dateStr = log.date;
+        
+        updatePromises.push(
+          supabase
+            .from('nifty_logs')
+            .update({ stock_return: returnVal, earnings: earnings })
+            .eq('id', log.id)
+        );
 
-        await supabase
-          .from('nifty_logs')
-          .update({ 
-            stock_return: returnVal, 
-            earnings: earnings 
-          })
-          .eq('id', log.id);
-
-        await supabase
-          .from('stock_history')
-          .upsert({ 
-            date: dateStr, 
-            symbol: symbol, 
-            close_percentage: returnVal 
-          }, { onConflict: 'date,symbol' });
+        if (!uniqueHistory.has(symbol)) {
+          uniqueHistory.set(symbol, {
+            date: log.date,
+            symbol: symbol,
+            close_percentage: returnVal
+          });
+        }
       }
-      console.log(`Settled ${niftyLogs.length} Nifty 50 picks.`);
+
+      const historyPromises = Array.from(uniqueHistory.values()).map(record =>
+        supabase
+          .from('stock_history')
+          .upsert(record, { onConflict: 'date,symbol' })
+      );
+
+      await Promise.all([...updatePromises, ...historyPromises]);
+      
+      console.log(`Settled ${niftyLogs.length} Nifty 50 picks and updated history.`);
     }
 
-    // 5. SETTLE SENSEX (New Dynamic Logic)
+    // 5. SETTLE SENSEX
     await settleSensex(supabase, stockData);
 
     return new Response(JSON.stringify({ 

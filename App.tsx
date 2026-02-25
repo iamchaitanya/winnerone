@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom'; // New imports
 import { HomeView } from './views/HomeView';
 import { AdditionView } from './views/AdditionView';
 import { Nifty50View } from './views/Nifty50View';
@@ -12,7 +13,7 @@ import { fetchAndCacheHolidays } from './src/lib/holidayManager';
 import { useGameStore } from './src/store/useGameStore';
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<ViewType>(ViewType.HOME);
+  const navigate = useNavigate(); // Hook for navigation
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theme') === 'dark' || 
@@ -21,7 +22,6 @@ const App: React.FC = () => {
     return false;
   });
 
-  // We only need the setter actions here; the views consume the data
   const { setSettings, setProfiles } = useGameStore();
   const [isSyncing, setIsSyncing] = useState(true);
 
@@ -42,7 +42,6 @@ const App: React.FC = () => {
     let profilesChannel: any;
 
     const syncData = async () => {
-      // 1. Initial Fetch
       const { data: settingsData } = await supabase.from('app_settings').select('*').returns<AppSetting[]>();
       if (settingsData && isMounted) setSettings(mapSettings(settingsData));
 
@@ -55,7 +54,6 @@ const App: React.FC = () => {
     syncData();
     fetchAndCacheHolidays();
 
-    // 2. Real-time Subscription Setup
     const timer = setTimeout(() => {
       if (!isMounted) return;
 
@@ -97,13 +95,25 @@ const App: React.FC = () => {
     };
   }, [mapSettings, setSettings, setProfiles]);
 
-  // Theme Management
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
     localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
+
+  // Helper to map old Enum navigation to new Routes
+  const handleNavigate = (view: ViewType) => {
+    const pathMap: Record<ViewType, string> = {
+      [ViewType.HOME]: '/',
+      [ViewType.ADDITION]: '/addition',
+      [ViewType.NIFTY50]: '/nifty50',
+      [ViewType.SENSEX]: '/sensex',
+      [ViewType.DASHBOARD]: '/dashboard',
+      [ViewType.ADMIN]: '/admin'
+    };
+    navigate(pathMap[view]);
+  };
 
   if (isSyncing) {
     return (
@@ -115,30 +125,21 @@ const App: React.FC = () => {
     );
   }
 
-  // Look how clean this is now! No more drilling.
-  const renderView = () => {
-    switch (currentView) {
-      case ViewType.HOME:
-        return <HomeView onNavigate={setCurrentView} isDarkMode={isDarkMode} onToggleDark={toggleDarkMode} />;
-      case ViewType.ADDITION:
-        return <AdditionView onBack={() => setCurrentView(ViewType.HOME)} />;
-      case ViewType.NIFTY50:
-        return <Nifty50View onBack={() => setCurrentView(ViewType.HOME)} />;
-      case ViewType.SENSEX:
-        return <SensexView onBack={() => setCurrentView(ViewType.HOME)} />;  
-      case ViewType.DASHBOARD:
-        return <DashboardView onBack={() => setCurrentView(ViewType.HOME)} />;
-      case ViewType.ADMIN:
-        return <AdminView onBack={() => setCurrentView(ViewType.HOME)} />;
-      default:
-        return <HomeView onNavigate={setCurrentView} isDarkMode={isDarkMode} onToggleDark={toggleDarkMode} />;
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <main className="max-w-5xl mx-auto min-h-screen">
-        {renderView()}
+        <Routes>
+          <Route path="/" element={
+            <HomeView onNavigate={handleNavigate} isDarkMode={isDarkMode} onToggleDark={toggleDarkMode} />
+          } />
+          <Route path="/addition" element={<AdditionView onBack={() => navigate('/')} />} />
+          <Route path="/nifty50" element={<Nifty50View onBack={() => navigate('/')} />} />
+          <Route path="/sensex" element={<SensexView onBack={() => navigate('/')} />} />
+          <Route path="/dashboard" element={<DashboardView onBack={() => navigate('/')} />} />
+          <Route path="/admin" element={<AdminView onBack={() => navigate('/')} />} />
+          {/* Fallback to Home */}
+          <Route path="*" element={<HomeView onNavigate={handleNavigate} isDarkMode={isDarkMode} onToggleDark={toggleDarkMode} />} />
+        </Routes>
       </main>
     </div>
   );
