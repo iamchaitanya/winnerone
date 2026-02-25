@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ViewType } from '../src/types';
-import { PlusCircle, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart } from 'lucide-react';
+import { PlusCircle, MinusCircle, XCircle, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart } from 'lucide-react';
 import { useGameStore } from '../src/store/useGameStore';
 import { isMarketHoliday, getHolidayDetail } from '../src/lib/holidayManager';
 
@@ -162,8 +162,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
             <button
               onClick={() => settings.additionEnabled && onNavigate(ViewType.ADDITION)}
               className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.additionEnabled
-                  ? 'hover:shadow-2xl hover:border-indigo-200 dark:hover:border-indigo-500/50 active:scale-[0.98]'
-                  : 'opacity-50 grayscale cursor-not-allowed'
+                ? 'hover:shadow-2xl hover:border-indigo-200 dark:hover:border-indigo-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
                 }`}
             >
               <div className="flex items-center gap-6 w-full text-left">
@@ -179,10 +179,67 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
             </button>
 
             <button
+              onClick={() => settings.subtractionEnabled && onNavigate(ViewType.SUBTRACTION)}
+              className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.subtractionEnabled
+                ? 'hover:shadow-2xl hover:border-orange-200 dark:hover:border-orange-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
+                }`}
+            >
+              <div className="flex items-center gap-6 w-full text-left">
+                <div className={`p-4 rounded-2xl transition-transform ${settings.subtractionEnabled ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                  <MinusCircle size={32} />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">SUBTRACTION</span>
+                  {!settings.subtractionEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10} /> Disabled by Admin</span>}
+                  {settings.subtractionEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard & History</span>}
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => settings.multiplicationEnabled && onNavigate(ViewType.MULTIPLICATION)}
+              className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.multiplicationEnabled
+                ? 'hover:shadow-2xl hover:border-violet-200 dark:hover:border-violet-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
+                }`}
+            >
+              <div className="flex items-center gap-6 w-full text-left">
+                <div className={`p-4 rounded-2xl transition-transform ${settings.multiplicationEnabled ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                  <XCircle size={32} />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">12×12</span>
+                  {!settings.multiplicationEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10} /> Disabled by Admin</span>}
+                  {settings.multiplicationEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard & History</span>}
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => settings.multiplication25Enabled && onNavigate(ViewType.MULTIPLICATION25)}
+              className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.multiplication25Enabled
+                ? 'hover:shadow-2xl hover:border-teal-200 dark:hover:border-teal-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
+                }`}
+            >
+              <div className="flex items-center gap-6 w-full text-left">
+                <div className={`p-4 rounded-2xl transition-transform ${settings.multiplication25Enabled ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                  <XCircle size={32} />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">25×25</span>
+                  {!settings.multiplication25Enabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10} /> Disabled by Admin</span>}
+                  {settings.multiplication25Enabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard &amp; History</span>}
+                </div>
+              </div>
+            </button>
+
+            <button
               onClick={() => settings.niftyEnabled && onNavigate(ViewType.NIFTY50)}
               className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.niftyEnabled
-                  ? 'hover:shadow-2xl hover:border-emerald-200 dark:hover:border-emerald-500/50 active:scale-[0.98]'
-                  : 'opacity-50 grayscale cursor-not-allowed'
+                ? 'hover:shadow-2xl hover:border-emerald-200 dark:hover:border-emerald-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
                 }`}
             >
               <div className="flex items-center gap-6 w-full text-left">
@@ -202,14 +259,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
             <button
               onClick={() => settings.sensexEnabled && onNavigate(ViewType.SENSEX)}
               className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.sensexEnabled
-                  ? 'hover:shadow-2xl hover:border-amber-200 dark:hover:border-amber-500/50 active:scale-[0.98]'
-                  : 'opacity-50 grayscale cursor-not-allowed'
+                ? 'hover:shadow-2xl hover:border-amber-200 dark:hover:border-amber-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
                 }`}
             >
               <div className="flex items-center gap-6 w-full text-left">
                 <div className={`p-4 rounded-2xl transition-transform ${settings.sensexEnabled
-                    ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 group-hover:scale-110'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                  ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 group-hover:scale-110'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
                   }`}>
                   <TrendingUp size={32} />
                 </div>

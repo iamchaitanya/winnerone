@@ -7,7 +7,10 @@ interface PlayerScoreSummary {
   player_name: string;
   addition_total: number;
   nifty_total: number;
-  sensex_total: number; // Added
+  sensex_total: number;
+  subtraction_total: number;
+  multiplication_total: number;
+  multiplication25_total: number;
   grand_total: number;
 }
 
@@ -17,13 +20,19 @@ interface DashboardViewProps {
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
-  
+
   const [ayaanAddition, setAyaanAddition] = useState(0);
   const [riyaanAddition, setRiyaanAddition] = useState(0);
   const [ayaanNifty, setAyaanNifty] = useState(0);
   const [riyaanNifty, setRiyaanNifty] = useState(0);
-  const [ayaanSensex, setAyaanSensex] = useState(0); // Added
-  const [riyaanSensex, setRiyaanSensex] = useState(0); // Added
+  const [ayaanSensex, setAyaanSensex] = useState(0);
+  const [riyaanSensex, setRiyaanSensex] = useState(0);
+  const [ayaanSubtraction, setAyaanSubtraction] = useState(0);
+  const [riyaanSubtraction, setRiyaanSubtraction] = useState(0);
+  const [ayaanMultiplication, setAyaanMultiplication] = useState(0);
+  const [riyaanMultiplication, setRiyaanMultiplication] = useState(0);
+  const [ayaanMultiplication25, setAyaanMultiplication25] = useState(0);
+  const [riyaanMultiplication25, setRiyaanMultiplication25] = useState(0);
 
   const fetchScores = useCallback(async () => {
     setLoading(true);
@@ -44,11 +53,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
           setAyaanAddition(ayaan.addition_total);
           setAyaanNifty(ayaan.nifty_total);
           setAyaanSensex(ayaan.sensex_total || 0);
+          setAyaanSubtraction(ayaan.subtraction_total || 0);
+          setAyaanMultiplication(ayaan.multiplication_total || 0);
+          setAyaanMultiplication25(ayaan.multiplication25_total || 0);
         }
         if (riyaan) {
           setRiyaanAddition(riyaan.addition_total);
           setRiyaanNifty(riyaan.nifty_total);
           setRiyaanSensex(riyaan.sensex_total || 0);
+          setRiyaanSubtraction(riyaan.subtraction_total || 0);
+          setRiyaanMultiplication(riyaan.multiplication_total || 0);
+          setRiyaanMultiplication25(riyaan.multiplication25_total || 0);
         }
       }
     } catch (error) {
@@ -60,20 +75,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
 
   useEffect(() => {
     fetchScores();
+
+    // 🔴 Live sync — re-fetch whenever any game log changes
+    const channel = supabase
+      .channel('dashboard_live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'addition_logs' }, fetchScores)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subtraction_logs' }, fetchScores)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'multiplication_logs' }, fetchScores)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'multiplication25_logs' }, fetchScores)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'nifty_logs' }, fetchScores)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sensex_logs' }, fetchScores)
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [fetchScores]);
 
   // Update total calculations to include Sensex
-  const ayaanTotal = ayaanAddition + ayaanNifty + ayaanSensex;
-  const riyaanTotal = riyaanAddition + riyaanNifty + riyaanSensex;
-  
+  const ayaanTotal = ayaanAddition + ayaanNifty + ayaanSensex + ayaanSubtraction + ayaanMultiplication + ayaanMultiplication25;
+  const riyaanTotal = riyaanAddition + riyaanNifty + riyaanSensex + riyaanSubtraction + riyaanMultiplication + riyaanMultiplication25;
+
   const isAyaanLeading = ayaanTotal >= riyaanTotal;
   const leaderBaseTotal = isAyaanLeading ? ayaanTotal : riyaanTotal;
   const leaderName = isAyaanLeading ? 'Ayaan' : 'Riyaan';
-  
+
   const leaderBonus = leaderBaseTotal > 0 ? leaderBaseTotal * 0.3 : 0;
   const leaderTotalWithBonus = leaderBaseTotal + leaderBonus;
-  
-  const formatCurrency = (value: number) => 
+
+  const formatCurrency = (value: number) =>
     `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
@@ -139,11 +167,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                 {formatCurrency(ayaanTotal)}
               </span>
             </div>
-            <div className="grid grid-cols-2 grid-rows-2 gap-3"> {/* Changed to 3 columns */}
+            <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Addition</p>
                 <p className={`text-sm font-black ${ayaanAddition < 0 ? 'text-rose-500' : 'text-indigo-600 dark:text-indigo-400'}`}>
                   {loading ? '...' : formatCurrency(ayaanAddition)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Subtraction</p>
+                <p className={`text-sm font-black ${ayaanSubtraction < 0 ? 'text-rose-500' : 'text-orange-600 dark:text-orange-400'}`}>
+                  {loading ? '...' : formatCurrency(ayaanSubtraction)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">12×12</p>
+                <p className={`text-sm font-black ${ayaanMultiplication < 0 ? 'text-rose-500' : 'text-violet-600 dark:text-violet-400'}`}>
+                  {loading ? '...' : formatCurrency(ayaanMultiplication)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">25×25</p>
+                <p className={`text-sm font-black ${ayaanMultiplication25 < 0 ? 'text-rose-500' : 'text-teal-600 dark:text-teal-400'}`}>
+                  {loading ? '...' : formatCurrency(ayaanMultiplication25)}
                 </p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
@@ -154,7 +200,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Sensex</p>
-                <p className={`text-sm font-black ${ayaanSensex < 0 ? 'text-rose-500' : 'text-orange-600 dark:text-orange-400'}`}>
+                <p className={`text-sm font-black ${ayaanSensex < 0 ? 'text-rose-500' : 'text-amber-600 dark:text-amber-400'}`}>
                   {formatCurrency(ayaanSensex)}
                 </p>
               </div>
@@ -172,11 +218,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                 {formatCurrency(riyaanTotal)}
               </span>
             </div>
-            <div className="grid grid-cols-2 grid-rows-2 gap-3"> {/* Changed to 3 columns */}
+            <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Addition</p>
                 <p className={`text-sm font-black ${riyaanAddition < 0 ? 'text-rose-500' : 'text-rose-600 dark:text-rose-400'}`}>
                   {loading ? '...' : formatCurrency(riyaanAddition)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Subtraction</p>
+                <p className={`text-sm font-black ${riyaanSubtraction < 0 ? 'text-rose-500' : 'text-orange-600 dark:text-orange-400'}`}>
+                  {loading ? '...' : formatCurrency(riyaanSubtraction)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">12×12</p>
+                <p className={`text-sm font-black ${riyaanMultiplication < 0 ? 'text-rose-500' : 'text-violet-600 dark:text-violet-400'}`}>
+                  {loading ? '...' : formatCurrency(riyaanMultiplication)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">25×25</p>
+                <p className={`text-sm font-black ${riyaanMultiplication25 < 0 ? 'text-rose-500' : 'text-teal-600 dark:text-teal-400'}`}>
+                  {loading ? '...' : formatCurrency(riyaanMultiplication25)}
                 </p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
@@ -187,7 +251,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Sensex</p>
-                <p className={`text-sm font-black ${riyaanSensex < 0 ? 'text-rose-500' : 'text-orange-600 dark:text-orange-400'}`}>
+                <p className={`text-sm font-black ${riyaanSensex < 0 ? 'text-rose-500' : 'text-amber-600 dark:text-amber-400'}`}>
                   {formatCurrency(riyaanSensex)}
                 </p>
               </div>

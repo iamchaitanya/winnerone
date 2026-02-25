@@ -1,0 +1,304 @@
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { isMarketHoliday } from '../src/lib/holidayManager';
+import { supabase } from '../src/lib/supabase';
+import { PLAYER_IDS } from '../src/lib/constants';
+import { useGameStore } from '../src/store/useGameStore';
+
+import { useMultiplicationEngine, MulQuestionResult } from '../src/hooks/useMultiplicationEngine';
+
+import { MultiplicationHub } from '../src/components/multiplication/MultiplicationHub';
+import { MultiplicationPinEntry } from '../src/components/multiplication/MultiplicationPinEntry';
+import { MultiplicationPreEntry } from '../src/components/multiplication/MultiplicationPreEntry';
+import { MultiplicationQuiz } from '../src/components/multiplication/MultiplicationQuiz';
+import { MultiplicationResults } from '../src/components/multiplication/MultiplicationResults';
+import { MultiplicationDashboard } from '../src/components/multiplication/MultiplicationDashboard';
+import { MultiplicationReview } from '../src/components/multiplication/MultiplicationReview';
+import { MultiplicationHistory } from '../src/components/multiplication/MultiplicationHistory';
+
+interface MultiplicationViewProps {
+    onBack: () => void;
+}
+
+enum MulSubView {
+    HUB = 'hub',
+    PIN_ENTRY = 'pin_entry',
+    PRE_ENTRY = 'pre_entry',
+    QUIZ = 'quiz',
+    RESULTS = 'results',
+    LOCAL_DASHBOARD = 'local_dashboard',
+    REVIEW = 'review',
+    MASTER_HISTORY = 'master_history'
+}
+
+interface GameSession {
+    id: string;
+    player: string;
+    score: number;
+    wrong: number;
+    earnings: number;
+    timestamp: number;
+    results?: MulQuestionResult[];
+}
+
+interface DailyRecord {
+    dateKey: string;
+    displayDate: string;
+    timestamp: number;
+    ayaanEarnings: number | null;
+    ayaanTime: string | null;
+    riyaanEarnings: number | null;
+    riyaanTime: string | null;
+}
+
+const getISTDateKey = (date: Date | number) =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date));
+
+export const MultiplicationView: React.FC<MultiplicationViewProps> = ({ onBack }) => {
+    const settings = useGameStore(s => s.settings);
+    const profiles = useGameStore(s => s.profiles);
+
+    const [subView, setSubView] = useState<MulSubView>(MulSubView.HUB);
+    const [selectedUser, setSelectedUser] = useState<string | null>(null);
+    const [historyFilter, setHistoryFilter] = useState<'Ayaan' | 'Riyaan'>('Ayaan');
+
+    const dateOverride = settings.dateOverride;
+    const isPinEntryEnabled = settings.pinEntryEnabled;
+    const isSubmittingRef = useRef(false);
+
+    const [ayaanTotal, setAyaanTotal] = useState(0);
+    const [riyaanTotal, setRiyaanTotal] = useState(0);
+    const [history, setHistory] = useState<GameSession[]>([]);
+    const [sessionResults, setSessionResults] = useState<MulQuestionResult[]>([]);
+    const [finalSessionEarnings, setFinalSessionEarnings] = useState(0);
+    const [finalScore, setFinalScore] = useState(0);
+    const [finalWrong, setFinalWrong] = useState(0);
+
+    const getUserProfile = useCallback((name: string | null) => profiles.find(p => p.player_name === name), [profiles]);
+
+    const syncWithCloud = useCallback(async () => {
+        const { data, error } = await supabase
+            .from('multiplication_logs')
+            .select('*')
+            .order('played_at', { ascending: false })
+            .limit(500);
+
+        if (error || !data) return;
+
+        let aTotal = 0, rTotal = 0;
+        const cloudHistory: GameSession[] = data.map((log: any) => {
+            const pName = log.player_id === PLAYER_IDS.Ayaan ? 'Ayaan' : 'Riyaan';
+            if (pName === 'Ayaan') aTotal += log.earnings;
+            if (pName === 'Riyaan') rTotal += log.earnings;
+            return {
+                id: log.id, player: pName, score: log.score, wrong: log.wrong_count,
+                earnings: log.earnings, timestamp: new Date(log.played_at).getTime(), results: log.details
+            };
+        });
+        setAyaanTotal(aTotal);
+        setRiyaanTotal(rTotal);
+        setHistory(cloudHistory);
+    }, []);
+
+    useEffect(() => {
+        syncWithCloud();
+        const channel = supabase.channel('multiplication_logs_live')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'multiplication_logs' }, syncWithCloud)
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [syncWithCloud]);
+
+    const getEffectiveDate = useCallback(() => {
+        if (dateOverride) {
+            const d = new Date(dateOverride);
+            if (isNaN(d.getTime())) return new Date();
+            if (!dateOverride.includes('T')) {
+                const now = new Date();
+                const [y, m, day] = dateOverride.split('-').map(Number);
+                const localDate = new Date();
+                localDate.setFullYear(y, m - 1, day);
+                localDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+                return localDate;
+            }
+            return d;
+        }
+        return new Date();
+    }, [dateOverride]);
+
+    const isMarketOpenDay = useCallback(() => {
+        const d = getEffectiveDate();
+        return d.getDay() !== 0 && d.getDay() !== 6 && !isMarketHoliday(getISTDateKey(d));
+    }, [getEffectiveDate]);
+
+    const hasPlayedToday = useCallback((player: string | null) => {
+        if (!player) return false;
+        const todayIST = getISTDateKey(getEffectiveDate());
+        const inCloud = history.some(s => s.player === player && getISTDateKey(s.timestamp) === todayIST);
+        if (inCloud) return true;
+        return localStorage.getItem(`multiplication_attempt_${player}_${todayIST}`) === 'started';
+    }, [history, getEffectiveDate]);
+
+    const getTodaySession = useCallback((player: string | null) => {
+        if (!player) return null;
+        const todayIST = getISTDateKey(getEffectiveDate());
+        return history.find(s => s.player === player && getISTDateKey(s.timestamp) === todayIST) || null;
+    }, [history, getEffectiveDate]);
+
+    const finishQuiz = useCallback(async (fScore: number, fWrong: number, fResults: MulQuestionResult[]) => {
+        if (isSubmittingRef.current) return;
+        isSubmittingRef.current = true;
+
+        const earnings = fScore - fWrong;
+        setFinalScore(fScore);
+        setFinalWrong(fWrong);
+        setFinalSessionEarnings(earnings);
+        setSessionResults(fResults);
+
+        const effectiveTime = getEffectiveDate().getTime();
+        if (selectedUser) {
+            const userProfile = getUserProfile(selectedUser);
+            const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
+            await supabase.from('multiplication_logs').insert({
+                player_id: playerId, score: fScore, wrong_count: fWrong, earnings,
+                details: fResults, played_at: new Date(effectiveTime).toISOString()
+            });
+        }
+        setSubView(MulSubView.RESULTS);
+        isSubmittingRef.current = false;
+    }, [selectedUser, getEffectiveDate, getUserProfile]);
+
+    const { questions, currentIndex, userInput, score, timeLeft, startQuiz: triggerEngineStart, handleKeyClick } =
+        useMultiplicationEngine(finishQuiz);
+
+    const startQuiz = () => {
+        if (!isMarketOpenDay()) return alert('Market closed!');
+        if (hasPlayedToday(selectedUser)) return alert('Already played today!');
+        if (selectedUser) {
+            localStorage.setItem(`multiplication_attempt_${selectedUser}_${getISTDateKey(getEffectiveDate())}`, 'started');
+        }
+        triggerEngineStart();
+        setSubView(MulSubView.QUIZ);
+    };
+
+    const groupedHistory = useMemo(() => {
+        const groups: Record<string, DailyRecord> = {};
+        history.forEach(session => {
+            const dateKey = getISTDateKey(session.timestamp);
+            if (!groups[dateKey]) {
+                groups[dateKey] = {
+                    dateKey,
+                    displayDate: new Date(session.timestamp).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric' }),
+                    timestamp: session.timestamp,
+                    ayaanEarnings: null, ayaanTime: null, riyaanEarnings: null, riyaanTime: null,
+                };
+            }
+            if (session.player === 'Ayaan') {
+                groups[dateKey].ayaanEarnings = (groups[dateKey].ayaanEarnings || 0) + session.earnings;
+                groups[dateKey].ayaanTime = new Date(session.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+            } else {
+                groups[dateKey].riyaanEarnings = (groups[dateKey].riyaanEarnings || 0) + session.earnings;
+                groups[dateKey].riyaanTime = new Date(session.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+            }
+        });
+        return Object.values(groups).sort((a, b) => b.timestamp - a.timestamp);
+    }, [history]);
+
+    const masterQuestionHistory = useMemo(() => {
+        const all: Array<MulQuestionResult & { player: string; timestamp: number }> = [];
+        history.forEach(s => s.results?.forEach(q => all.push({ ...q, player: s.player, timestamp: s.timestamp })));
+        return all.filter(q => q.player === historyFilter).sort((a, b) => b.timestamp - a.timestamp);
+    }, [history, historyFilter]);
+
+    switch (subView) {
+        case MulSubView.HUB:
+            return (
+                <MultiplicationHub
+                    onBack={onBack}
+                    onNavigate={v => setSubView(v as MulSubView)}
+                    onUserSelect={u => {
+                        setSelectedUser(u);
+                        setSubView(isPinEntryEnabled ? MulSubView.PIN_ENTRY : MulSubView.PRE_ENTRY);
+                    }}
+                    isMarketWorkingDay={isMarketOpenDay()}
+                    dateOverride={dateOverride}
+                    isWeekend={[0, 6].includes(getEffectiveDate().getDay())}
+                    isPublicHoliday={isMarketHoliday(getISTDateKey(getEffectiveDate()))}
+                    hasPlayedToday={hasPlayedToday}
+                    isUserLocked={u => getUserProfile(u)?.is_locked || false}
+                />
+            );
+        case MulSubView.PIN_ENTRY:
+            return (
+                <MultiplicationPinEntry
+                    selectedUser={selectedUser}
+                    onSuccess={() => setSubView(MulSubView.PRE_ENTRY)}
+                    onBack={() => setSubView(MulSubView.HUB)}
+                />
+            );
+        case MulSubView.PRE_ENTRY:
+            return (
+                <MultiplicationPreEntry
+                    selectedUser={selectedUser}
+                    isPlayed={hasPlayedToday(selectedUser)}
+                    isMarketWorking={isMarketOpenDay()}
+                    todaySession={getTodaySession(selectedUser)}
+                    onStart={startQuiz}
+                    onReview={s => {
+                        setSessionResults(s.results || []);
+                        setFinalScore(s.score);
+                        setFinalWrong(s.wrong);
+                        setFinalSessionEarnings(s.earnings);
+                        setSubView(MulSubView.REVIEW);
+                    }}
+                    onBack={() => setSubView(MulSubView.HUB)}
+                />
+            );
+        case MulSubView.QUIZ:
+            return (
+                <MultiplicationQuiz
+                    currentQ={questions[currentIndex]}
+                    currentIndex={currentIndex}
+                    timeLeft={timeLeft}
+                    score={score}
+                    userInput={userInput}
+                    onKeyClick={handleKeyClick}
+                />
+            );
+        case MulSubView.RESULTS:
+            return (
+                <MultiplicationResults
+                    finalSessionEarnings={finalSessionEarnings}
+                    finalScore={finalScore}
+                    finalWrong={finalWrong}
+                    onReview={() => setSubView(MulSubView.REVIEW)}
+                    onExit={() => setSubView(MulSubView.HUB)}
+                />
+            );
+        case MulSubView.LOCAL_DASHBOARD:
+            return (
+                <MultiplicationDashboard
+                    ayaanTotal={ayaanTotal}
+                    riyaanTotal={riyaanTotal}
+                    groupedHistory={groupedHistory}
+                    onBack={() => setSubView(MulSubView.HUB)}
+                />
+            );
+        case MulSubView.REVIEW:
+            return (
+                <MultiplicationReview
+                    sessionResults={sessionResults}
+                    onBack={() => setSubView(MulSubView.RESULTS)}
+                />
+            );
+        case MulSubView.MASTER_HISTORY:
+            return (
+                <MultiplicationHistory
+                    masterQuestionHistory={masterQuestionHistory}
+                    historyFilter={historyFilter}
+                    setHistoryFilter={setHistoryFilter}
+                    onBack={() => setSubView(MulSubView.HUB)}
+                />
+            );
+        default:
+            return null;
+    }
+};

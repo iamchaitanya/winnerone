@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom'; // New imports
 import { HomeView } from './views/HomeView';
 import { AdditionView } from './views/AdditionView';
+import { SubtractionView } from './views/SubtractionView';
+import { MultiplicationView } from './views/MultiplicationView';
+import { Multiplication25View } from './views/Multiplication25View';
 import { Nifty50View } from './views/Nifty50View';
 import { SensexView } from './views/SensexView';
 import { DashboardView } from './views/DashboardView';
@@ -16,7 +19,7 @@ const App: React.FC = () => {
   const navigate = useNavigate(); // Hook for navigation
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') === 'dark' || 
+      return localStorage.getItem('theme') === 'dark' ||
         (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
     }
     return false;
@@ -30,6 +33,9 @@ const App: React.FC = () => {
     return {
       dateOverride: map['addition_date_override'] as string || null,
       additionEnabled: map['game_enabled_addition'] !== false,
+      subtractionEnabled: map['game_enabled_subtraction'] !== false,
+      multiplicationEnabled: map['game_enabled_multiplication'] !== false,
+      multiplication25Enabled: map['game_enabled_multiplication25'] !== false,
       niftyEnabled: map['game_enabled_nifty'] !== false,
       sensexEnabled: map['game_enabled_sensex'] !== false,
       pinEntryEnabled: map['pin_entry_enabled'] !== false,
@@ -47,7 +53,7 @@ const App: React.FC = () => {
 
       const { data: profilesData } = await supabase.from('profiles').select('*').returns<Profile[]>();
       if (profilesData && isMounted) setProfiles(profilesData);
-      
+
       if (isMounted) setIsSyncing(false);
     };
 
@@ -65,6 +71,9 @@ const App: React.FC = () => {
             const keyMap: Record<string, string> = {
               'addition_date_override': 'dateOverride',
               'game_enabled_addition': 'additionEnabled',
+              'game_enabled_subtraction': 'subtractionEnabled',
+              'game_enabled_multiplication': 'multiplicationEnabled',
+              'game_enabled_multiplication25': 'multiplication25Enabled',
               'game_enabled_nifty': 'niftyEnabled',
               'game_enabled_sensex': 'sensexEnabled',
               'pin_entry_enabled': 'pinEntryEnabled'
@@ -79,7 +88,7 @@ const App: React.FC = () => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
           const updatedProfile = payload.new as Profile;
           if (updatedProfile) {
-            const updatedProfiles = useGameStore.getState().profiles.map(p => 
+            const updatedProfiles = useGameStore.getState().profiles.map(p =>
               p.id === updatedProfile.id ? { ...p, ...updatedProfile } : p
             );
             setProfiles(updatedProfiles);
@@ -107,6 +116,9 @@ const App: React.FC = () => {
     const pathMap: Record<ViewType, string> = {
       [ViewType.HOME]: '/',
       [ViewType.ADDITION]: '/addition',
+      [ViewType.SUBTRACTION]: '/subtraction',
+      [ViewType.MULTIPLICATION]: '/multiplication',
+      [ViewType.MULTIPLICATION25]: '/multiplication25',
       [ViewType.NIFTY50]: '/nifty50',
       [ViewType.SENSEX]: '/sensex',
       [ViewType.DASHBOARD]: '/dashboard',
@@ -133,6 +145,9 @@ const App: React.FC = () => {
             <HomeView onNavigate={handleNavigate} isDarkMode={isDarkMode} onToggleDark={toggleDarkMode} />
           } />
           <Route path="/addition" element={<AdditionView onBack={() => navigate('/')} />} />
+          <Route path="/subtraction" element={<SubtractionView onBack={() => navigate('/')} />} />
+          <Route path="/multiplication" element={<MultiplicationView onBack={() => navigate('/')} />} />
+          <Route path="/multiplication25" element={<Multiplication25View onBack={() => navigate('/')} />} />
           <Route path="/nifty50" element={<Nifty50View onBack={() => navigate('/')} />} />
           <Route path="/sensex" element={<SensexView onBack={() => navigate('/')} />} />
           <Route path="/dashboard" element={<DashboardView onBack={() => navigate('/')} />} />

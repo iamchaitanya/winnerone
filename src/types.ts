@@ -1,6 +1,9 @@
 export enum ViewType {
   HOME = 'home',
   ADDITION = 'addition',
+  SUBTRACTION = 'subtraction',
+  MULTIPLICATION = 'multiplication',
+  MULTIPLICATION25 = 'multiplication25',
   NIFTY50 = 'nifty50',
   SENSEX = 'sensex',
   DASHBOARD = 'dashboard',
@@ -21,7 +24,7 @@ export interface StockData {
  */
 
 export interface AppSetting {
-  key: 'addition_date_override' | 'game_enabled_addition' | 'game_enabled_nifty' | 'game_enabled_sensex'| 'pin_entry_enabled';
+  key: 'addition_date_override' | 'game_enabled_addition' | 'game_enabled_nifty' | 'game_enabled_sensex' | 'pin_entry_enabled';
   value: string | boolean | null;
 }
 
@@ -41,6 +44,13 @@ export interface AdditionLog {
   player_id: string;
   earnings: number;
   created_at?: string;
+}
+
+export interface SubtractionLog {
+  id?: string;
+  player_id: string;
+  earnings: number;
+  played_at?: string;
 }
 
 export interface NiftyLog {

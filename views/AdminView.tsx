@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Settings, Calendar, RotateCcw, ToggleLeft, ToggleRight, Gamepad2, Clock, Lock, UserCheck, Trash2, AlertTriangle, Fingerprint } from 'lucide-react';
-import { supabase } from '../src/lib/supabase'; 
+import { supabase } from '../src/lib/supabase';
 import { useGameStore } from '../src/store/useGameStore'; // Added store import
 
 interface AdminViewProps {
@@ -35,20 +35,20 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
       'game_enabled_sensex': 'sensexEnabled',
       'pin_entry_enabled': 'pinEntryEnabled'
     };
-    
+
     // Optimistic UI update via Zustand
     const storeKey = keyMap[key];
     if (storeKey) {
       setSettings({ [storeKey]: value });
     }
-    
+
     // Cloud update
     await supabase.from('app_settings').upsert({ key, value });
   };
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const { data, error } = await supabase
       .from('app_settings')
       .select('value')
@@ -70,6 +70,9 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
 
   // Toggles using the new self-contained update handler
   const toggleAddition = () => handleUpdateSetting('game_enabled_addition', !settings.additionEnabled);
+  const toggleSubtraction = () => handleUpdateSetting('game_enabled_subtraction', !settings.subtractionEnabled);
+  const toggleMultiplication = () => handleUpdateSetting('game_enabled_multiplication', !settings.multiplicationEnabled);
+  const toggleMultiplication25 = () => handleUpdateSetting('game_enabled_multiplication25', !settings.multiplication25Enabled);
   const toggleNifty = () => handleUpdateSetting('game_enabled_nifty', !settings.niftyEnabled);
   const toggleSensex = () => handleUpdateSetting('game_enabled_sensex', !settings.sensexEnabled);
   const togglePinEntry = () => handleUpdateSetting('pin_entry_enabled', !settings.pinEntryEnabled);
@@ -98,7 +101,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
         await supabase.from('addition_logs').delete().neq('id', safeUUID);
         await supabase.from('nifty_logs').delete().neq('id', safeUUID);
         await supabase.from('game_attempts').delete().not('id', 'is', null); // Safest fallback for any type
-        
+
         alert("✅ Cloud Wiped. App will restart.");
         window.location.reload();
       } catch (error) {
@@ -117,8 +120,8 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
         </div>
         <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 uppercase tracking-widest">Admin Access</h2>
         <form onSubmit={handleAdminLogin} className="w-full max-w-xs space-y-4">
-          <input 
-            type="password" 
+          <input
+            type="password"
             placeholder="PIN Code"
             autoFocus
             className="w-full h-16 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-center text-2xl font-black tracking-[0.5em] focus:border-indigo-500 outline-none transition-all shadow-sm"
@@ -151,7 +154,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
             <Lock size={20} className="text-indigo-500" />
             <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Security Management</h2>
           </div>
-          
+
           <div className="space-y-6">
             <div className="flex items-center justify-between p-4 bg-indigo-50 dark:bg-indigo-900/10 rounded-2xl border border-indigo-100 dark:border-indigo-800/30 mb-2">
               <div className="flex items-center gap-3">
@@ -168,8 +171,8 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
                 <div key={profile.id} className="space-y-4">
                   <div className="flex flex-col gap-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{profile.player_name} PIN</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       inputMode="numeric"
                       maxLength={6}
                       className="w-full h-14 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 px-4 font-bold text-slate-900 dark:text-white outline-none transition-all tabular-nums tracking-[0.2em]"
@@ -185,7 +188,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
                       </span>
                     </div>
                     {profile.pin_attempts > 0 && (
-                      <button 
+                      <button
                         onClick={() => resetUserLock(profile.id)}
                         className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl"
                       >
@@ -213,17 +216,35 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
               </button>
             </div>
             <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Subtraction Game</span>
+              <button onClick={toggleSubtraction}>
+                {settings.subtractionEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">12×12 Game</span>
+              <button onClick={toggleMultiplication}>
+                {settings.multiplicationEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">25×25 Game</span>
+              <button onClick={toggleMultiplication25}>
+                {settings.multiplication25Enabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
               <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Nifty 50 Game</span>
               <button onClick={toggleNifty}>
                 {settings.niftyEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
               </button>
             </div>
             <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
-    <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Sensex Game</span>
-    <button onClick={toggleSensex}>
-      {settings.sensexEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
-    </button>
-  </div>
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Sensex Game</span>
+              <button onClick={toggleSensex}>
+                {settings.sensexEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -236,15 +257,15 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
           <div className="space-y-4">
             <div className="flex flex-col gap-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Override Date & Time</label>
-              <input 
-                type="datetime-local" 
+              <input
+                type="datetime-local"
                 className="w-full h-14 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 px-4 font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none transition-all"
                 value={settings.dateOverride || ''}
                 onChange={(e) => updateDateOverride(e.target.value)}
               />
             </div>
             {settings.dateOverride && (
-              <button 
+              <button
                 onClick={clearDateOverride}
                 className="w-full h-14 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2"
               >
@@ -260,7 +281,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
             <AlertTriangle size={20} className="text-rose-500" />
             <h2 className="text-sm font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest">Danger Zone</h2>
           </div>
-          <button 
+          <button
             onClick={handleMasterReset}
             disabled={isResetting}
             className="w-full h-14 bg-rose-600 dark:bg-rose-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20"
