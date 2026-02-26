@@ -5,6 +5,8 @@ import { AdditionView } from './views/AdditionView';
 import { SubtractionView } from './views/SubtractionView';
 import { MultiplicationView } from './views/MultiplicationView';
 import { Multiplication25View } from './views/Multiplication25View';
+import { MultiplyView } from './views/MultiplyView';
+import { DivideView } from './views/DivideView';
 import { Nifty50View } from './views/Nifty50View';
 import { SensexView } from './views/SensexView';
 import { DashboardView } from './views/DashboardView';
@@ -36,6 +38,8 @@ const App: React.FC = () => {
       subtractionEnabled: map['game_enabled_subtraction'] !== false,
       multiplicationEnabled: map['game_enabled_multiplication'] !== false,
       multiplication25Enabled: map['game_enabled_multiplication25'] !== false,
+      multiplyEnabled: map['game_enabled_multiply'] !== false,
+      divideEnabled: map['game_enabled_divide'] !== false,
       niftyEnabled: map['game_enabled_nifty'] !== false,
       sensexEnabled: map['game_enabled_sensex'] !== false,
       pinEntryEnabled: map['pin_entry_enabled'] !== false,
@@ -74,6 +78,8 @@ const App: React.FC = () => {
               'game_enabled_subtraction': 'subtractionEnabled',
               'game_enabled_multiplication': 'multiplicationEnabled',
               'game_enabled_multiplication25': 'multiplication25Enabled',
+              'game_enabled_multiply': 'multiplyEnabled',
+              'game_enabled_divide': 'divideEnabled',
               'game_enabled_nifty': 'niftyEnabled',
               'game_enabled_sensex': 'sensexEnabled',
               'pin_entry_enabled': 'pinEntryEnabled'
@@ -119,6 +125,8 @@ const App: React.FC = () => {
       [ViewType.SUBTRACTION]: '/subtraction',
       [ViewType.MULTIPLICATION]: '/multiplication',
       [ViewType.MULTIPLICATION25]: '/multiplication25',
+      [ViewType.MULTIPLY]: '/multiply',
+      [ViewType.DIVIDE]: '/divide',
       [ViewType.NIFTY50]: '/nifty50',
       [ViewType.SENSEX]: '/sensex',
       [ViewType.DASHBOARD]: '/dashboard',
@@ -148,6 +156,8 @@ const App: React.FC = () => {
           <Route path="/subtraction" element={<SubtractionView onBack={() => navigate('/')} />} />
           <Route path="/multiplication" element={<MultiplicationView onBack={() => navigate('/')} />} />
           <Route path="/multiplication25" element={<Multiplication25View onBack={() => navigate('/')} />} />
+          <Route path="/multiply" element={<MultiplyView onBack={() => navigate('/')} />} />
+          <Route path="/divide" element={<DivideView onBack={() => navigate('/')} />} />
           <Route path="/nifty50" element={<Nifty50View onBack={() => navigate('/')} />} />
           <Route path="/sensex" element={<SensexView onBack={() => navigate('/')} />} />
           <Route path="/dashboard" element={<DashboardView onBack={() => navigate('/')} />} />

@@ -73,6 +73,8 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
   const toggleSubtraction = () => handleUpdateSetting('game_enabled_subtraction', !settings.subtractionEnabled);
   const toggleMultiplication = () => handleUpdateSetting('game_enabled_multiplication', !settings.multiplicationEnabled);
   const toggleMultiplication25 = () => handleUpdateSetting('game_enabled_multiplication25', !settings.multiplication25Enabled);
+  const toggleMultiply = () => handleUpdateSetting('game_enabled_multiply', !settings.multiplyEnabled);
+  const toggleDivide = () => handleUpdateSetting('game_enabled_divide', !settings.divideEnabled);
   const toggleNifty = () => handleUpdateSetting('game_enabled_nifty', !settings.niftyEnabled);
   const toggleSensex = () => handleUpdateSetting('game_enabled_sensex', !settings.sensexEnabled);
   const togglePinEntry = () => handleUpdateSetting('pin_entry_enabled', !settings.pinEntryEnabled);
@@ -231,6 +233,18 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
               <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">25×25 Game</span>
               <button onClick={toggleMultiplication25}>
                 {settings.multiplication25Enabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Multiply Game</span>
+              <button onClick={toggleMultiply}>
+                {settings.multiplyEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Divide Game</span>
+              <button onClick={toggleDivide}>
+                {settings.divideEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
               </button>
             </div>
             <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">

@@ -11,6 +11,8 @@ interface PlayerScoreSummary {
   subtraction_total: number;
   multiplication_total: number;
   multiplication25_total: number;
+  multiply_total: number;
+  divide_total: number;
   grand_total: number;
 }
 
@@ -33,6 +35,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
   const [riyaanMultiplication, setRiyaanMultiplication] = useState(0);
   const [ayaanMultiplication25, setAyaanMultiplication25] = useState(0);
   const [riyaanMultiplication25, setRiyaanMultiplication25] = useState(0);
+  const [ayaanMultiply, setAyaanMultiply] = useState(0);
+  const [riyaanMultiply, setRiyaanMultiply] = useState(0);
+  const [ayaanDivide, setAyaanDivide] = useState(0);
+  const [riyaanDivide, setRiyaanDivide] = useState(0);
 
   const fetchScores = useCallback(async () => {
     setLoading(true);
@@ -56,6 +62,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
           setAyaanSubtraction(ayaan.subtraction_total || 0);
           setAyaanMultiplication(ayaan.multiplication_total || 0);
           setAyaanMultiplication25(ayaan.multiplication25_total || 0);
+          setAyaanMultiply(ayaan.multiply_total || 0);
+          setAyaanDivide(ayaan.divide_total || 0);
         }
         if (riyaan) {
           setRiyaanAddition(riyaan.addition_total);
@@ -64,6 +72,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
           setRiyaanSubtraction(riyaan.subtraction_total || 0);
           setRiyaanMultiplication(riyaan.multiplication_total || 0);
           setRiyaanMultiplication25(riyaan.multiplication25_total || 0);
+          setRiyaanMultiply(riyaan.multiply_total || 0);
+          setRiyaanDivide(riyaan.divide_total || 0);
         }
       }
     } catch (error) {
@@ -83,6 +93,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subtraction_logs' }, fetchScores)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'multiplication_logs' }, fetchScores)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'multiplication25_logs' }, fetchScores)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'multiply_logs' }, fetchScores)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'divide_logs' }, fetchScores)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'nifty_logs' }, fetchScores)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sensex_logs' }, fetchScores)
       .subscribe();
@@ -91,8 +103,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
   }, [fetchScores]);
 
   // Update total calculations to include Sensex
-  const ayaanTotal = ayaanAddition + ayaanNifty + ayaanSensex + ayaanSubtraction + ayaanMultiplication + ayaanMultiplication25;
-  const riyaanTotal = riyaanAddition + riyaanNifty + riyaanSensex + riyaanSubtraction + riyaanMultiplication + riyaanMultiplication25;
+  const ayaanTotal = ayaanAddition + ayaanNifty + ayaanSensex + ayaanSubtraction + ayaanMultiplication + ayaanMultiplication25 + ayaanMultiply + ayaanDivide;
+  const riyaanTotal = riyaanAddition + riyaanNifty + riyaanSensex + riyaanSubtraction + riyaanMultiplication + riyaanMultiplication25 + riyaanMultiply + riyaanDivide;
 
   const isAyaanLeading = ayaanTotal >= riyaanTotal;
   const leaderBaseTotal = isAyaanLeading ? ayaanTotal : riyaanTotal;
@@ -193,6 +205,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                 </p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Multiply</p>
+                <p className={`text-sm font-black ${ayaanMultiply < 0 ? 'text-rose-500' : 'text-pink-600 dark:text-pink-400'}`}>
+                  {loading ? '...' : formatCurrency(ayaanMultiply)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Divide</p>
+                <p className={`text-sm font-black ${ayaanDivide < 0 ? 'text-rose-500' : 'text-sky-600 dark:text-sky-400'}`}>
+                  {loading ? '...' : formatCurrency(ayaanDivide)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50</p>
                 <p className={`text-sm font-black ${ayaanNifty < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   {formatCurrency(ayaanNifty)}
@@ -241,6 +265,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">25×25</p>
                 <p className={`text-sm font-black ${riyaanMultiplication25 < 0 ? 'text-rose-500' : 'text-teal-600 dark:text-teal-400'}`}>
                   {loading ? '...' : formatCurrency(riyaanMultiplication25)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Multiply</p>
+                <p className={`text-sm font-black ${riyaanMultiply < 0 ? 'text-rose-500' : 'text-pink-600 dark:text-pink-400'}`}>
+                  {loading ? '...' : formatCurrency(riyaanMultiply)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Divide</p>
+                <p className={`text-sm font-black ${riyaanDivide < 0 ? 'text-rose-500' : 'text-sky-600 dark:text-sky-400'}`}>
+                  {loading ? '...' : formatCurrency(riyaanDivide)}
                 </p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">

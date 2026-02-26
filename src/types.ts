@@ -4,6 +4,8 @@ export enum ViewType {
   SUBTRACTION = 'subtraction',
   MULTIPLICATION = 'multiplication',
   MULTIPLICATION25 = 'multiplication25',
+  MULTIPLY = 'multiply',
+  DIVIDE = 'divide',
   NIFTY50 = 'nifty50',
   SENSEX = 'sensex',
   DASHBOARD = 'dashboard',

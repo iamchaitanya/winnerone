@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ViewType } from '../src/types';
-import { PlusCircle, MinusCircle, XCircle, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart } from 'lucide-react';
+import { PlusCircle, MinusCircle, XCircle, Divide, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart } from 'lucide-react';
 import { useGameStore } from '../src/store/useGameStore';
 import { isMarketHoliday, getHolidayDetail } from '../src/lib/holidayManager';
 
@@ -231,6 +231,44 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                   <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">25×25</span>
                   {!settings.multiplication25Enabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10} /> Disabled by Admin</span>}
                   {settings.multiplication25Enabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard &amp; History</span>}
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => settings.multiplyEnabled && onNavigate(ViewType.MULTIPLY)}
+              className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.multiplyEnabled
+                ? 'hover:shadow-2xl hover:border-pink-200 dark:hover:border-pink-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
+                }`}
+            >
+              <div className="flex items-center gap-6 w-full text-left">
+                <div className={`p-4 rounded-2xl transition-transform ${settings.multiplyEnabled ? 'bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                  <XCircle size={32} />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">Multiply</span>
+                  {!settings.multiplyEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10} /> Disabled by Admin</span>}
+                  {settings.multiplyEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard &amp; History</span>}
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => settings.divideEnabled && onNavigate(ViewType.DIVIDE)}
+              className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.divideEnabled
+                ? 'hover:shadow-2xl hover:border-sky-200 dark:hover:border-sky-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
+                }`}
+            >
+              <div className="flex items-center gap-6 w-full text-left">
+                <div className={`p-4 rounded-2xl transition-transform ${settings.divideEnabled ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                  <Divide size={32} />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">Divide</span>
+                  {!settings.divideEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10} /> Disabled by Admin</span>}
+                  {settings.divideEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard &amp; History</span>}
                 </div>
               </div>
             </button>

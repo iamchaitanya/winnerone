@@ -9,6 +9,8 @@ interface GameState {
     subtractionEnabled: boolean;
     multiplicationEnabled: boolean;
     multiplication25Enabled: boolean;
+    multiplyEnabled: boolean;
+    divideEnabled: boolean;
     niftyEnabled: boolean;
     sensexEnabled: boolean;
     pinEntryEnabled: boolean;
@@ -27,6 +29,8 @@ export const useGameStore = create<GameState>((set) => ({
     subtractionEnabled: true,
     multiplicationEnabled: true,
     multiplication25Enabled: true,
+    multiplyEnabled: true,
+    divideEnabled: true,
     niftyEnabled: true,
     sensexEnabled: true,
     pinEntryEnabled: true,
