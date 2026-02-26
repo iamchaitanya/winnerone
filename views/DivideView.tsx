@@ -102,10 +102,17 @@ export const DivideView: React.FC<DivideViewProps> = ({ onBack }) => {
         if (selectedUser) {
             const up = getUserProfile(selectedUser);
             const pid = up ? up.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
-            await supabase.from('divide_logs').insert({
+
+            const payload = {
                 player_id: pid, score: fScore, wrong_count: fWrong, earnings, details: fResults,
                 played_at: new Date(getEffectiveDate().getTime()).toISOString()
-            });
+            };
+
+            const { error: insertError } = await supabase.from('divide_logs').insert(payload);
+            if (insertError) {
+                alert("INSERT ERROR: " + JSON.stringify(insertError) + " PAYLOAD: " + JSON.stringify(payload));
+                console.error("Supabase insert error:", insertError, payload);
+            }
             await syncWithCloud();
         }
         setSubView(SV.RESULTS); isSubmittingRef.current = false;
