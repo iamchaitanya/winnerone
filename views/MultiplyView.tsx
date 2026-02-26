@@ -106,9 +106,10 @@ export const MultiplyView: React.FC<MultiplyViewProps> = ({ onBack }) => {
                 player_id: pid, score: fScore, wrong_count: fWrong, earnings, details: fResults,
                 played_at: new Date(getEffectiveDate().getTime()).toISOString()
             });
+            await syncWithCloud();
         }
         setSubView(SV.RESULTS); isSubmittingRef.current = false;
-    }, [selectedUser, getEffectiveDate, getUserProfile]);
+    }, [selectedUser, getEffectiveDate, getUserProfile, syncWithCloud]);
 
     const { questions, currentIndex, userInput, score, timeLeft, startQuiz: triggerEngineStart, handleKeyClick } = useMultiplyEngine(finishQuiz);
 

@@ -106,9 +106,10 @@ export const DivideView: React.FC<DivideViewProps> = ({ onBack }) => {
                 player_id: pid, score: fScore, wrong_count: fWrong, earnings, details: fResults,
                 played_at: new Date(getEffectiveDate().getTime()).toISOString()
             });
+            await syncWithCloud();
         }
         setSubView(SV.RESULTS); isSubmittingRef.current = false;
-    }, [selectedUser, getEffectiveDate, getUserProfile]);
+    }, [selectedUser, getEffectiveDate, getUserProfile, syncWithCloud]);
 
     const { questions, currentIndex, userInput, displayInput, score, timeLeft, startQuiz: triggerEngineStart, handleKeyClick } = useDivideEngine(finishQuiz);
 
