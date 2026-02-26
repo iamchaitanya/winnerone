@@ -161,7 +161,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
           <>
             <button
               onClick={() => settings.additionEnabled && onNavigate(ViewType.ADDITION)}
-              className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.additionEnabled
+              className={`relative overflow-hidden flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.additionEnabled
                 ? 'hover:shadow-2xl hover:border-indigo-200 dark:hover:border-indigo-500/50 active:scale-[0.98]'
                 : 'opacity-50 grayscale cursor-not-allowed'
                 }`}
@@ -176,11 +176,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                   {settings.additionEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard & History</span>}
                 </div>
               </div>
+              {settings.additionMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.additionMultiplier}×</span>}
             </button>
 
             <button
               onClick={() => settings.subtractionEnabled && onNavigate(ViewType.SUBTRACTION)}
-              className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.subtractionEnabled
+              className={`relative overflow-hidden flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.subtractionEnabled
                 ? 'hover:shadow-2xl hover:border-orange-200 dark:hover:border-orange-500/50 active:scale-[0.98]'
                 : 'opacity-50 grayscale cursor-not-allowed'
                 }`}
@@ -195,11 +196,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                   {settings.subtractionEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard & History</span>}
                 </div>
               </div>
+              {settings.subtractionMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.subtractionMultiplier}×</span>}
             </button>
 
             <button
               onClick={() => settings.multiplicationEnabled && onNavigate(ViewType.MULTIPLICATION)}
-              className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.multiplicationEnabled
+              className={`relative overflow-hidden flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.multiplicationEnabled
                 ? 'hover:shadow-2xl hover:border-violet-200 dark:hover:border-violet-500/50 active:scale-[0.98]'
                 : 'opacity-50 grayscale cursor-not-allowed'
                 }`}
@@ -214,11 +216,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                   {settings.multiplicationEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard & History</span>}
                 </div>
               </div>
+              {settings.multiplicationMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.multiplicationMultiplier}×</span>}
             </button>
 
             <button
               onClick={() => settings.multiplication25Enabled && onNavigate(ViewType.MULTIPLICATION25)}
-              className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.multiplication25Enabled
+              className={`relative overflow-hidden flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.multiplication25Enabled
                 ? 'hover:shadow-2xl hover:border-teal-200 dark:hover:border-teal-500/50 active:scale-[0.98]'
                 : 'opacity-50 grayscale cursor-not-allowed'
                 }`}
@@ -233,11 +236,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                   {settings.multiplication25Enabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard &amp; History</span>}
                 </div>
               </div>
+              {settings.multiplication25Multiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.multiplication25Multiplier}×</span>}
             </button>
 
             <button
               onClick={() => settings.multiplyEnabled && onNavigate(ViewType.MULTIPLY)}
-              className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.multiplyEnabled
+              className={`relative overflow-hidden flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.multiplyEnabled
                 ? 'hover:shadow-2xl hover:border-pink-200 dark:hover:border-pink-500/50 active:scale-[0.98]'
                 : 'opacity-50 grayscale cursor-not-allowed'
                 }`}
@@ -252,11 +256,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                   {settings.multiplyEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard &amp; History</span>}
                 </div>
               </div>
+              {settings.multiplyMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.multiplyMultiplier}×</span>}
             </button>
 
             <button
               onClick={() => settings.divideEnabled && onNavigate(ViewType.DIVIDE)}
-              className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.divideEnabled
+              className={`relative overflow-hidden flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.divideEnabled
                 ? 'hover:shadow-2xl hover:border-sky-200 dark:hover:border-sky-500/50 active:scale-[0.98]'
                 : 'opacity-50 grayscale cursor-not-allowed'
                 }`}
@@ -271,6 +276,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                   {settings.divideEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard &amp; History</span>}
                 </div>
               </div>
+              {settings.divideMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.divideMultiplier}×</span>}
             </button>
 
             <button
