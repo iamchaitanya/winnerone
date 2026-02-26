@@ -125,10 +125,6 @@ export const useMultiplicationEngine = (
     }, [questions, currentIndex, score, wrongCount, sessionResults, onFinish]);
 
     const handleKeyClick = (val: string) => {
-        if (val === 'DEL') {
-            setUserInput(prev => prev.slice(0, -1));
-            return;
-        }
         if (userInput.length < 3) {
             const newInput = userInput + val;
             setUserInput(newInput);

@@ -20,9 +20,10 @@ export const MultiplicationResults: React.FC<MultiplicationResultsProps> = ({
                 <IndianRupee size={64} />
             </div>
             <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Session Earnings</h2>
-            <div className={`text-6xl font-black mb-12 tabular-nums ${finalSessionEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+            <div className={`text-6xl font-black mb-3 tabular-nums ${finalSessionEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                 ₹{finalSessionEarnings}
             </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-10">+₹1 correct · −₹1 wrong</p>
             <div className="grid grid-cols-3 gap-4 mb-12 w-full max-w-xs">
                 <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl">
                     <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Correct</p>
