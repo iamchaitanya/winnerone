@@ -31,9 +31,20 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
     const keyMap: Record<string, string> = {
       'addition_date_override': 'dateOverride',
       'game_enabled_addition': 'additionEnabled',
+      'game_enabled_subtraction': 'subtractionEnabled',
+      'game_enabled_multiplication': 'multiplicationEnabled',
+      'game_enabled_multiplication25': 'multiplication25Enabled',
+      'game_enabled_multiply': 'multiplyEnabled',
+      'game_enabled_divide': 'divideEnabled',
       'game_enabled_nifty': 'niftyEnabled',
       'game_enabled_sensex': 'sensexEnabled',
-      'pin_entry_enabled': 'pinEntryEnabled'
+      'pin_entry_enabled': 'pinEntryEnabled',
+      'game_multiplier_addition': 'additionMultiplier',
+      'game_multiplier_subtraction': 'subtractionMultiplier',
+      'game_multiplier_multiplication': 'multiplicationMultiplier',
+      'game_multiplier_multiplication25': 'multiplication25Multiplier',
+      'game_multiplier_multiply': 'multiplyMultiplier',
+      'game_multiplier_divide': 'divideMultiplier',
     };
 
     // Optimistic UI update via Zustand
@@ -259,6 +270,40 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
                 {settings.sensexEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Game Multipliers */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-lg">💰</span>
+            <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Earnings Multiplier</h2>
+          </div>
+          <p className="text-[10px] text-slate-400 font-medium mb-6">Score is always ±1 per question. Earnings = (correct − wrong) × multiplier.</p>
+          <div className="space-y-3">
+            {[
+              { label: 'Addition', key: 'game_multiplier_addition', value: settings.additionMultiplier },
+              { label: 'Subtraction', key: 'game_multiplier_subtraction', value: settings.subtractionMultiplier },
+              { label: '12×12', key: 'game_multiplier_multiplication', value: settings.multiplicationMultiplier },
+              { label: '25×25', key: 'game_multiplier_multiplication25', value: settings.multiplication25Multiplier },
+              { label: 'Multiply', key: 'game_multiplier_multiply', value: settings.multiplyMultiplier },
+              { label: 'Divide', key: 'game_multiplier_divide', value: settings.divideMultiplier },
+            ].map(({ label, key, value }) => (
+              <div key={key} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">{label}</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={value}
+                    onChange={(e) => handleUpdateSetting(key, Number(e.target.value))}
+                    className="w-20 px-3 py-2 text-right text-sm font-black bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white tabular-nums"
+                  />
+                  <span className="text-xs font-bold text-slate-400">×</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

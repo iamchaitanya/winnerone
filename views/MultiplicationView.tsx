@@ -147,7 +147,7 @@ export const MultiplicationView: React.FC<MultiplicationViewProps> = ({ onBack }
         if (isSubmittingRef.current) return;
         isSubmittingRef.current = true;
 
-        const earnings = fScore - fWrong;
+        const earnings = (fScore - fWrong) * settings.multiplicationMultiplier;
         setFinalScore(fScore);
         setFinalWrong(fWrong);
         setFinalSessionEarnings(earnings);
@@ -164,7 +164,7 @@ export const MultiplicationView: React.FC<MultiplicationViewProps> = ({ onBack }
         }
         setSubView(MulSubView.RESULTS);
         isSubmittingRef.current = false;
-    }, [selectedUser, getEffectiveDate, getUserProfile]);
+    }, [selectedUser, getEffectiveDate, getUserProfile, settings.multiplicationMultiplier]);
 
     const { questions, currentIndex, userInput, score, timeLeft, startQuiz: triggerEngineStart, handleKeyClick } =
         useMultiplicationEngine(finishQuiz);

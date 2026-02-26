@@ -97,7 +97,7 @@ export const DivideView: React.FC<DivideViewProps> = ({ onBack }) => {
     const finishQuiz = useCallback(async (fScore: number, fWrong: number, fResults: DivQuestionResult[]) => {
         if (isSubmittingRef.current) return;
         isSubmittingRef.current = true;
-        const earnings = fScore * 3 - fWrong * 3;
+        const earnings = (fScore - fWrong) * settings.divideMultiplier;
         setFinalScore(fScore); setFinalWrong(fWrong); setFinalSessionEarnings(earnings); setSessionResults(fResults);
         if (selectedUser) {
             const up = getUserProfile(selectedUser);
@@ -109,7 +109,7 @@ export const DivideView: React.FC<DivideViewProps> = ({ onBack }) => {
             await syncWithCloud();
         }
         setSubView(SV.RESULTS); isSubmittingRef.current = false;
-    }, [selectedUser, getEffectiveDate, getUserProfile, syncWithCloud]);
+    }, [selectedUser, getEffectiveDate, getUserProfile, syncWithCloud, settings.divideMultiplier]);
 
     const { questions, currentIndex, userInput, displayInput, score, timeLeft, startQuiz: triggerEngineStart, handleKeyClick } = useDivideEngine(finishQuiz);
 

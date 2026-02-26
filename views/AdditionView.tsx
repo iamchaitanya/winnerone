@@ -191,7 +191,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
 
-    const earnings = fScore - fWrong;
+    const earnings = (fScore - fWrong) * settings.additionMultiplier;
     setFinalScore(fScore);
     setFinalWrong(fWrong);
     setFinalSessionEarnings(earnings);
@@ -216,7 +216,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
 
     setSubView(AdditionSubView.RESULTS);
     isSubmittingRef.current = false;
-  }, [selectedUser, getEffectiveDate, getUserProfile]);
+  }, [selectedUser, getEffectiveDate, getUserProfile, settings.additionMultiplier]);
 
   const {
     questions,

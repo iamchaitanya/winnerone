@@ -97,7 +97,7 @@ export const MultiplyView: React.FC<MultiplyViewProps> = ({ onBack }) => {
     const finishQuiz = useCallback(async (fScore: number, fWrong: number, fResults: MulQuestionResult[]) => {
         if (isSubmittingRef.current) return;
         isSubmittingRef.current = true;
-        const earnings = fScore * 2 - fWrong * 2;
+        const earnings = (fScore - fWrong) * settings.multiplyMultiplier;
         setFinalScore(fScore); setFinalWrong(fWrong); setFinalSessionEarnings(earnings); setSessionResults(fResults);
         if (selectedUser) {
             const up = getUserProfile(selectedUser);
@@ -109,7 +109,7 @@ export const MultiplyView: React.FC<MultiplyViewProps> = ({ onBack }) => {
             await syncWithCloud();
         }
         setSubView(SV.RESULTS); isSubmittingRef.current = false;
-    }, [selectedUser, getEffectiveDate, getUserProfile, syncWithCloud]);
+    }, [selectedUser, getEffectiveDate, getUserProfile, syncWithCloud, settings.multiplyMultiplier]);
 
     const { questions, currentIndex, userInput, score, timeLeft, startQuiz: triggerEngineStart, handleKeyClick } = useMultiplyEngine(finishQuiz);
 

@@ -113,8 +113,7 @@ export const Multiplication25View: React.FC<Multiplication25ViewProps> = ({ onBa
     const finishQuiz = useCallback(async (fScore: number, fWrong: number, fResults: Mul25QuestionResult[]) => {
         if (isSubmittingRef.current) return;
         isSubmittingRef.current = true;
-        // +2 per correct, -2 per wrong
-        const earnings = fScore * 2 - fWrong * 2;
+        const earnings = (fScore - fWrong) * settings.multiplication25Multiplier;
         setFinalScore(fScore); setFinalWrong(fWrong); setFinalSessionEarnings(earnings); setSessionResults(fResults);
         const effectiveTime = getEffectiveDate().getTime();
         if (selectedUser) {
@@ -124,7 +123,7 @@ export const Multiplication25View: React.FC<Multiplication25ViewProps> = ({ onBa
         }
         setSubView(Mul25SubView.RESULTS);
         isSubmittingRef.current = false;
-    }, [selectedUser, getEffectiveDate, getUserProfile]);
+    }, [selectedUser, getEffectiveDate, getUserProfile, settings.multiplication25Multiplier]);
 
     const { questions, currentIndex, userInput, score, timeLeft, startQuiz: triggerEngineStart, handleKeyClick } = useMultiplication25Engine(finishQuiz);
 

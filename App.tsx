@@ -43,6 +43,12 @@ const App: React.FC = () => {
       niftyEnabled: map['game_enabled_nifty'] !== false,
       sensexEnabled: map['game_enabled_sensex'] !== false,
       pinEntryEnabled: map['pin_entry_enabled'] !== false,
+      additionMultiplier: Number(map['game_multiplier_addition']) || 1,
+      subtractionMultiplier: Number(map['game_multiplier_subtraction']) || 1,
+      multiplicationMultiplier: Number(map['game_multiplier_multiplication']) || 1,
+      multiplication25Multiplier: Number(map['game_multiplier_multiplication25']) || 2,
+      multiplyMultiplier: Number(map['game_multiplier_multiply']) || 2,
+      divideMultiplier: Number(map['game_multiplier_divide']) || 3,
     };
   }, []);
 
@@ -82,10 +88,19 @@ const App: React.FC = () => {
               'game_enabled_divide': 'divideEnabled',
               'game_enabled_nifty': 'niftyEnabled',
               'game_enabled_sensex': 'sensexEnabled',
-              'pin_entry_enabled': 'pinEntryEnabled'
+              'pin_entry_enabled': 'pinEntryEnabled',
+              'game_multiplier_addition': 'additionMultiplier',
+              'game_multiplier_subtraction': 'subtractionMultiplier',
+              'game_multiplier_multiplication': 'multiplicationMultiplier',
+              'game_multiplier_multiplication25': 'multiplication25Multiplier',
+              'game_multiplier_multiply': 'multiplyMultiplier',
+              'game_multiplier_divide': 'divideMultiplier'
             };
             const storeKey = keyMap[updatedRow.key];
-            if (storeKey) setSettings({ [storeKey]: updatedRow.value });
+            if (storeKey) {
+              const isMultiplier = storeKey.endsWith('Multiplier');
+              setSettings({ [storeKey]: isMultiplier ? Number(updatedRow.value) : updatedRow.value });
+            }
           }
         }).subscribe();
 
