@@ -1,5 +1,6 @@
 import React from 'react';
 import { User, Users, Check, Eye, CalendarX, Play } from 'lucide-react';
+import { useGameStore } from '../../store/useGameStore';
 
 interface MultiplicationPreEntryProps {
     selectedUser: string | null;
@@ -14,6 +15,7 @@ interface MultiplicationPreEntryProps {
 export const MultiplicationPreEntry: React.FC<MultiplicationPreEntryProps> = ({
     selectedUser, isPlayed, isMarketWorking, todaySession, onStart, onReview, onBack
 }) => {
+    const settings = useGameStore(s => s.settings);
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 animate-in zoom-in-95 duration-300 text-center">
             <div className="w-24 h-24 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl flex items-center justify-center mb-8 border border-slate-100 dark:border-slate-800">
@@ -40,7 +42,16 @@ export const MultiplicationPreEntry: React.FC<MultiplicationPreEntryProps> = ({
                 </div>
             ) : (
                 <>
-                    <p className="text-slate-400 font-medium mb-12 uppercase tracking-widest text-xs">Ready for the 100-Second Challenge?</p>
+                    <div className="w-full max-w-xs bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 mb-8 text-left shadow-sm">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">📋 Rules</p>
+                        <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-300 font-medium">
+                            <li>• Multiply & divide numbers from 1–12 tables</li>
+                            <li>• Mixed multiplication and division questions</li>
+                            <li>• 100 seconds to answer as many as possible</li>
+                            <li>• <span className="text-emerald-500 font-bold">+₹{settings.multiplicationMultiplier}</span> correct · <span className="text-rose-500 font-bold">−₹{settings.multiplicationMultiplier}</span> wrong</li>
+                            <li>• One attempt per day — no refreshing!</li>
+                        </ul>
+                    </div>
                     <button onClick={onStart}
                         className="w-full max-w-xs h-20 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 transition-all hover:scale-105 active:scale-95 shadow-xl mx-auto block">
                         <Play size={24} fill="currentColor" /> START

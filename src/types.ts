@@ -7,6 +7,7 @@ export enum ViewType {
   MULTIPLY = 'multiply',
   DIVIDE = 'divide',
   MENTALMATH = 'mentalmath',
+  MATHMASTERY = 'mathmastery',
   NIFTY50 = 'nifty50',
   SENSEX = 'sensex',
   DASHBOARD = 'dashboard',

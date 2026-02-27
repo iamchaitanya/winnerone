@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ViewType } from '../src/types';
-import { PlusCircle, MinusCircle, XCircle, Divide, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart, Brain, Check } from 'lucide-react';
+import { PlusCircle, MinusCircle, XCircle, Divide, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart, Brain, BrainCircuit, Check } from 'lucide-react';
 import { useGameStore } from '../src/store/useGameStore';
 import { isMarketHoliday, getHolidayDetail } from '../src/lib/holidayManager';
 import { supabase } from '../src/lib/supabase';
@@ -39,6 +39,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
       { key: 'multiply', table: 'multiply_logs', dateCol: 'played_at' },
       { key: 'divide', table: 'divide_logs', dateCol: 'played_at' },
       { key: 'mentalmath', table: 'mentalmath_logs', dateCol: 'played_at' },
+      { key: 'mathmastery', table: 'mathmastery_logs', dateCol: 'played_at' },
       { key: 'nifty', table: 'nifty_logs', dateCol: 'created_at' },
       { key: 'sensex', table: 'sensex_logs', dateCol: 'created_at' },
     ];
@@ -383,6 +384,30 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
               </div>
               {settings.mentalmathMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.mentalmathMultiplier}×</span>}
               <CompletionBadges gameKey="mentalmath" />
+            </button>
+
+            <button
+              onClick={() => {
+                console.log("Math Mastery clicked", { enabled: settings.mathmasteryEnabled, view: ViewType.MATHMASTERY });
+                if (settings.mathmasteryEnabled) onNavigate(ViewType.MATHMASTERY);
+              }}
+              className={`relative overflow-hidden flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.mathmasteryEnabled
+                ? 'hover:shadow-2xl hover:border-indigo-200 dark:hover:border-indigo-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
+                }`}
+            >
+              <div className="flex items-center gap-6 w-full text-left">
+                <div className={`p-4 rounded-2xl transition-transform ${settings.mathmasteryEnabled ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                  <BrainCircuit size={32} />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase leading-none mt-1">Math Mastery</span>
+                  {!settings.mathmasteryEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10} /> Disabled by Admin</span>}
+                  {settings.mathmasteryEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard &amp; History</span>}
+                </div>
+              </div>
+              {settings.mathmasteryMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.mathmasteryMultiplier}×</span>}
+              <CompletionBadges gameKey="mathmastery" />
             </button>
 
             <button

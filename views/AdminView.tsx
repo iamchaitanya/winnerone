@@ -36,6 +36,8 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
       'game_enabled_multiplication25': 'multiplication25Enabled',
       'game_enabled_multiply': 'multiplyEnabled',
       'game_enabled_divide': 'divideEnabled',
+      'game_enabled_mentalmath': 'mentalmathEnabled',
+      'game_enabled_mathmastery': 'mathmasteryEnabled',
       'game_enabled_nifty': 'niftyEnabled',
       'game_enabled_sensex': 'sensexEnabled',
       'pin_entry_enabled': 'pinEntryEnabled',
@@ -45,6 +47,8 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
       'game_multiplier_multiplication25': 'multiplication25Multiplier',
       'game_multiplier_multiply': 'multiplyMultiplier',
       'game_multiplier_divide': 'divideMultiplier',
+      'game_multiplier_mentalmath': 'mentalmathMultiplier',
+      'game_multiplier_mathmastery': 'mathmasteryMultiplier',
     };
 
     // Optimistic UI update via Zustand
@@ -86,6 +90,8 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
   const toggleMultiplication25 = () => handleUpdateSetting('game_enabled_multiplication25', !settings.multiplication25Enabled);
   const toggleMultiply = () => handleUpdateSetting('game_enabled_multiply', !settings.multiplyEnabled);
   const toggleDivide = () => handleUpdateSetting('game_enabled_divide', !settings.divideEnabled);
+  const toggleMentalMath = () => handleUpdateSetting('game_enabled_mentalmath', !settings.mentalmathEnabled);
+  const toggleMathMastery = () => handleUpdateSetting('game_enabled_mathmastery', !settings.mathmasteryEnabled);
   const toggleNifty = () => handleUpdateSetting('game_enabled_nifty', !settings.niftyEnabled);
   const toggleSensex = () => handleUpdateSetting('game_enabled_sensex', !settings.sensexEnabled);
   const togglePinEntry = () => handleUpdateSetting('pin_entry_enabled', !settings.pinEntryEnabled);
@@ -259,6 +265,18 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
               </button>
             </div>
             <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Mental Math</span>
+              <button onClick={toggleMentalMath}>
+                {settings.mentalmathEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Math Mastery</span>
+              <button onClick={toggleMathMastery}>
+                {settings.mathmasteryEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
               <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Nifty 50 Game</span>
               <button onClick={toggleNifty}>
                 {settings.niftyEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
@@ -288,6 +306,8 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
               { label: '25×25', key: 'game_multiplier_multiplication25', value: settings.multiplication25Multiplier },
               { label: 'Multiply', key: 'game_multiplier_multiply', value: settings.multiplyMultiplier },
               { label: 'Divide', key: 'game_multiplier_divide', value: settings.divideMultiplier },
+              { label: 'Mental Math', key: 'game_multiplier_mentalmath', value: settings.mentalmathMultiplier },
+              { label: 'Math Mastery', key: 'game_multiplier_mathmastery', value: settings.mathmasteryMultiplier },
             ].map(({ label, key, value }) => (
               <div key={key} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">{label}</span>

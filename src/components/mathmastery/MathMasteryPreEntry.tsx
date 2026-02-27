@@ -2,7 +2,7 @@ import React from 'react';
 import { User, Users, Check, Eye, CalendarX, Play } from 'lucide-react';
 import { useGameStore } from '../../store/useGameStore';
 
-interface MentalMathPreEntryProps {
+interface MathMasteryPreEntryProps {
     selectedUser: string | null;
     isPlayed: boolean;
     isMarketWorking: boolean;
@@ -12,16 +12,14 @@ interface MentalMathPreEntryProps {
     onBack: () => void;
 }
 
-export const MentalMathPreEntry: React.FC<MentalMathPreEntryProps> = ({
+export const MathMasteryPreEntry: React.FC<MathMasteryPreEntryProps> = ({
     selectedUser, isPlayed, isMarketWorking, todaySession, onStart, onReview, onBack
 }) => {
     const settings = useGameStore(s => s.settings);
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 animate-in zoom-in-95 duration-300 text-center">
             <div className="w-24 h-24 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl flex items-center justify-center mb-8 border border-slate-100 dark:border-slate-800">
-                {selectedUser === 'Ayaan'
-                    ? <User size={48} className="text-cyan-600" />
-                    : <Users size={48} className="text-teal-600" />}
+                {selectedUser === 'Ayaan' ? <User size={48} className="text-indigo-600" /> : <Users size={48} className="text-purple-600" />}
             </div>
             <h2 className="text-4xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Hello, {selectedUser}</h2>
 
@@ -31,10 +29,8 @@ export const MentalMathPreEntry: React.FC<MentalMathPreEntryProps> = ({
                         <Check size={20} className="text-emerald-500" />
                         <p className="text-emerald-600 dark:text-emerald-400 font-bold text-sm uppercase tracking-wide">You've finished today's challenge!</p>
                     </div>
-                    <button
-                        onClick={() => { if (todaySession) onReview(todaySession); }}
-                        className="w-full max-w-xs h-20 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 transition-all hover:scale-105 active:scale-95 shadow-xl mx-auto block"
-                    >
+                    <button onClick={() => { if (todaySession) onReview(todaySession); }}
+                        className="w-full max-w-xs h-20 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 transition-all hover:scale-105 active:scale-95 shadow-xl mx-auto block">
                         <Eye size={24} /> REVIEW RESULTS
                     </button>
                 </>
@@ -42,29 +38,37 @@ export const MentalMathPreEntry: React.FC<MentalMathPreEntryProps> = ({
                 <div className="bg-amber-50 dark:bg-amber-900/20 px-8 py-6 rounded-[2rem] border border-amber-100 dark:border-amber-800/50 mb-12 max-w-xs">
                     <CalendarX size={32} className="text-amber-500 mx-auto mb-3" />
                     <p className="text-amber-600 dark:text-amber-400 font-black text-sm uppercase tracking-wide">Market Closed</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-2">Games only allowed Monday–Friday, excluding holidays.</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-2">Picks and games only allowed Monday–Friday, excluding holidays.</p>
                 </div>
             ) : (
                 <>
                     <div className="w-full max-w-xs bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 mb-8 text-left shadow-sm">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">📋 Rules</p>
-                        <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-300 font-medium">
-                            <li>• Numbers flash on screen — keep a running total</li>
-                            <li>• Enter the final running total at each checkpoint</li>
-                            <li>• 95 seconds to complete the challenge</li>
-                            <li>• <span className="text-emerald-500 font-bold">+₹{settings.mentalmathMultiplier}</span> correct · <span className="text-rose-500 font-bold">−₹{settings.mentalmathMultiplier}</span> wrong</li>
-                            <li>• One attempt per day — no refreshing!</li>
+                        <ul className="space-y-1.5 text-[13px] text-slate-600 dark:text-slate-300 font-medium">
+                            <li>• Primes up to 200</li>
+                            <li>• Squares up to 50² (both ways: 25²=? and √625=?)</li>
+                            <li>• Cubes up to 30³</li>
+                            <li>• Fractions 1/2 to 1/20 as % (e.g. 1/8 = 12.5)</li>
+                            <li>• Factorials up to 8!</li>
+                            <li>• Powers: 2^1–12, 3^1–6, 5^1–6</li>
+                            <li>• First 6 Pythagorean triplets</li>
+                            <li>• log 2, 3, 5, 7 values</li>
                         </ul>
+                        <div className="border-t border-slate-100 dark:border-slate-800 mt-3 pt-3">
+                            <ul className="space-y-1.5 text-[13px] text-slate-600 dark:text-slate-300 font-medium">
+                                <li>• Questions asked both ways (forward & reverse)</li>
+                                <li>• 100 seconds — answer as many as you can</li>
+                                <li>• <span className="text-emerald-500 font-bold">+₹{settings.mathmasteryMultiplier}</span> correct · <span className="text-rose-500 font-bold">−₹{settings.mathmasteryMultiplier}</span> wrong</li>
+                                <li>• One attempt per day — no refreshing!</li>
+                            </ul>
+                        </div>
                     </div>
-                    <button
-                        onClick={onStart}
-                        className="w-full max-w-xs h-20 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 transition-all hover:scale-105 active:scale-95 shadow-xl mx-auto block"
-                    >
+                    <button onClick={onStart}
+                        className="w-full max-w-xs h-20 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 transition-all hover:scale-105 active:scale-95 shadow-xl mx-auto block">
                         <Play size={24} fill="currentColor" /> START
                     </button>
                 </>
             )}
-
             <button onClick={onBack} className="mt-8 text-slate-400 font-bold text-sm uppercase tracking-widest">Back</button>
         </div>
     );

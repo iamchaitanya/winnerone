@@ -8,6 +8,7 @@ import { Multiplication25View } from './views/Multiplication25View';
 import { MultiplyView } from './views/MultiplyView';
 import { DivideView } from './views/DivideView';
 import { MentalMathView } from './views/MentalMathView';
+import { MathMasteryView } from './views/MathMasteryView';
 import { Nifty50View } from './views/Nifty50View';
 import { SensexView } from './views/SensexView';
 import { DashboardView } from './views/DashboardView';
@@ -42,6 +43,7 @@ const App: React.FC = () => {
       multiplyEnabled: map['game_enabled_multiply'] !== false,
       divideEnabled: map['game_enabled_divide'] !== false,
       mentalmathEnabled: map['game_enabled_mentalmath'] !== false,
+      mathmasteryEnabled: map['game_enabled_mathmastery'] !== false,
       niftyEnabled: map['game_enabled_nifty'] !== false,
       sensexEnabled: map['game_enabled_sensex'] !== false,
       pinEntryEnabled: map['pin_entry_enabled'] !== false,
@@ -52,6 +54,7 @@ const App: React.FC = () => {
       multiplyMultiplier: Number(map['game_multiplier_multiply']) || 2,
       divideMultiplier: Number(map['game_multiplier_divide']) || 3,
       mentalmathMultiplier: Number(map['game_multiplier_mentalmath']) || 1,
+      mathmasteryMultiplier: Number(map['game_multiplier_mathmastery']) || 1,
     };
   }, []);
 
@@ -148,6 +151,7 @@ const App: React.FC = () => {
       [ViewType.MULTIPLY]: '/multiply',
       [ViewType.DIVIDE]: '/divide',
       [ViewType.MENTALMATH]: '/mentalmath',
+      [ViewType.MATHMASTERY]: '/mathmastery',
       [ViewType.NIFTY50]: '/nifty50',
       [ViewType.SENSEX]: '/sensex',
       [ViewType.DASHBOARD]: '/dashboard',
@@ -180,6 +184,7 @@ const App: React.FC = () => {
           <Route path="/multiply" element={<MultiplyView onBack={() => navigate('/')} />} />
           <Route path="/divide" element={<DivideView onBack={() => navigate('/')} />} />
           <Route path="/mentalmath" element={<MentalMathView onBack={() => navigate('/')} />} />
+          <Route path="/mathmastery" element={<MathMasteryView onBack={() => navigate('/')} />} />
           <Route path="/nifty50" element={<Nifty50View onBack={() => navigate('/')} />} />
           <Route path="/sensex" element={<SensexView onBack={() => navigate('/')} />} />
           <Route path="/dashboard" element={<DashboardView onBack={() => navigate('/')} />} />
