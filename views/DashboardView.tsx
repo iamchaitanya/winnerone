@@ -13,6 +13,7 @@ interface PlayerScoreSummary {
   multiplication25_total: number;
   multiply_total: number;
   divide_total: number;
+  mentalmath_total: number;
   grand_total: number;
 }
 
@@ -39,6 +40,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
   const [riyaanMultiply, setRiyaanMultiply] = useState(0);
   const [ayaanDivide, setAyaanDivide] = useState(0);
   const [riyaanDivide, setRiyaanDivide] = useState(0);
+  const [ayaanMentalmath, setAyaanMentalmath] = useState(0);
+  const [riyaanMentalmath, setRiyaanMentalmath] = useState(0);
 
   const fetchScores = useCallback(async () => {
     setLoading(true);
@@ -64,6 +67,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
           setAyaanMultiplication25(ayaan.multiplication25_total || 0);
           setAyaanMultiply(ayaan.multiply_total || 0);
           setAyaanDivide(ayaan.divide_total || 0);
+          setAyaanMentalmath(ayaan.mentalmath_total || 0);
         }
         if (riyaan) {
           setRiyaanAddition(riyaan.addition_total);
@@ -74,6 +78,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
           setRiyaanMultiplication25(riyaan.multiplication25_total || 0);
           setRiyaanMultiply(riyaan.multiply_total || 0);
           setRiyaanDivide(riyaan.divide_total || 0);
+          setRiyaanMentalmath(riyaan.mentalmath_total || 0);
         }
       }
     } catch (error) {
@@ -95,6 +100,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'multiplication25_logs' }, fetchScores)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'multiply_logs' }, fetchScores)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'divide_logs' }, fetchScores)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mentalmath_logs' }, fetchScores)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'nifty_logs' }, fetchScores)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sensex_logs' }, fetchScores)
       .subscribe();
@@ -103,8 +109,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
   }, [fetchScores]);
 
   // Update total calculations to include Sensex
-  const ayaanTotal = ayaanAddition + ayaanNifty + ayaanSensex + ayaanSubtraction + ayaanMultiplication + ayaanMultiplication25 + ayaanMultiply + ayaanDivide;
-  const riyaanTotal = riyaanAddition + riyaanNifty + riyaanSensex + riyaanSubtraction + riyaanMultiplication + riyaanMultiplication25 + riyaanMultiply + riyaanDivide;
+  const ayaanTotal = ayaanAddition + ayaanNifty + ayaanSensex + ayaanSubtraction + ayaanMultiplication + ayaanMultiplication25 + ayaanMultiply + ayaanDivide + ayaanMentalmath;
+  const riyaanTotal = riyaanAddition + riyaanNifty + riyaanSensex + riyaanSubtraction + riyaanMultiplication + riyaanMultiplication25 + riyaanMultiply + riyaanDivide + riyaanMentalmath;
 
   const isAyaanLeading = ayaanTotal >= riyaanTotal;
   const leaderBaseTotal = isAyaanLeading ? ayaanTotal : riyaanTotal;
@@ -217,6 +223,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                 </p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Mental Math</p>
+                <p className={`text-sm font-black ${ayaanMentalmath < 0 ? 'text-rose-500' : 'text-cyan-600 dark:text-cyan-400'}`}>
+                  {loading ? '...' : formatCurrency(ayaanMentalmath)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Nifty 50</p>
                 <p className={`text-sm font-black ${ayaanNifty < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   {formatCurrency(ayaanNifty)}
@@ -277,6 +289,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Divide</p>
                 <p className={`text-sm font-black ${riyaanDivide < 0 ? 'text-rose-500' : 'text-sky-600 dark:text-sky-400'}`}>
                   {loading ? '...' : formatCurrency(riyaanDivide)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Mental Math</p>
+                <p className={`text-sm font-black ${riyaanMentalmath < 0 ? 'text-rose-500' : 'text-cyan-600 dark:text-cyan-400'}`}>
+                  {loading ? '...' : formatCurrency(riyaanMentalmath)}
                 </p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">

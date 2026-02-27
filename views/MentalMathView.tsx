@@ -5,23 +5,23 @@ import { PLAYER_IDS } from '../src/lib/constants';
 import { useGameStore } from '../src/store/useGameStore';
 
 // Hook
-import { useSubtractionEngine } from '../src/hooks/useSubtractionEngine';
+import { useMentalMathEngine, MentalMathResult } from '../src/hooks/useMentalMathEngine';
 
 // Components
-import { SubtractionHub } from '../src/components/subtraction/SubtractionHub';
+import { MentalMathHub } from '../src/components/mentalmath/MentalMathHub';
 import { SubtractionPinEntry } from '../src/components/subtraction/SubtractionPinEntry';
-import { SubtractionPreEntry } from '../src/components/subtraction/SubtractionPreEntry';
-import { SubtractionQuiz } from '../src/components/subtraction/SubtractionQuiz';
-import { SubtractionResults } from '../src/components/subtraction/SubtractionResults';
-import { SubtractionDashboard } from '../src/components/subtraction/SubtractionDashboard';
-import { SubtractionReview } from '../src/components/subtraction/SubtractionReview';
-import { SubtractionHistory } from '../src/components/subtraction/SubtractionHistory';
+import { MentalMathPreEntry } from '../src/components/mentalmath/MentalMathPreEntry';
+import { MentalMathQuiz } from '../src/components/mentalmath/MentalMathQuiz';
+import { MentalMathResults } from '../src/components/mentalmath/MentalMathResults';
+import { MentalMathDashboard } from '../src/components/mentalmath/MentalMathDashboard';
+import { MentalMathReview } from '../src/components/mentalmath/MentalMathReview';
+import { MentalMathHistory } from '../src/components/mentalmath/MentalMathHistory';
 
-interface SubtractionViewProps {
+interface MentalMathViewProps {
     onBack: () => void;
 }
 
-enum SubtractionSubView {
+enum MentalMathSubView {
     HUB = 'hub',
     PIN_ENTRY = 'pin_entry',
     PRE_ENTRY = 'pre_entry',
@@ -32,18 +32,6 @@ enum SubtractionSubView {
     MASTER_HISTORY = 'master_history'
 }
 
-interface Question {
-    num1: number;
-    num2: number;
-    answer: number;
-}
-
-interface QuestionResult extends Question {
-    userAnswer: number;
-    isCorrect: boolean;
-    timeTaken?: number;
-}
-
 interface GameSession {
     id: string;
     player: string;
@@ -51,7 +39,7 @@ interface GameSession {
     wrong: number;
     earnings: number;
     timestamp: number;
-    results?: QuestionResult[];
+    details?: any;
 }
 
 interface DailyRecord {
@@ -64,7 +52,6 @@ interface DailyRecord {
     riyaanTime: string | null;
 }
 
-// 🌐 Strict IST Date Key (YYYY-MM-DD) — same as AdditionView
 const getISTDateKey = (date: Date | number) => {
     return new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Kolkata',
@@ -74,11 +61,11 @@ const getISTDateKey = (date: Date | number) => {
     }).format(new Date(date));
 };
 
-export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
+export const MentalMathView: React.FC<MentalMathViewProps> = ({ onBack }) => {
     const settings = useGameStore((state) => state.settings);
     const profiles = useGameStore((state) => state.profiles);
 
-    const [subView, setSubView] = useState<SubtractionSubView>(SubtractionSubView.HUB);
+    const [subView, setSubView] = useState<MentalMathSubView>(MentalMathSubView.HUB);
     const [selectedUser, setSelectedUser] = useState<string | null>(null);
     const [historyFilter, setHistoryFilter] = useState<'Ayaan' | 'Riyaan'>('Ayaan');
 
@@ -89,10 +76,10 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
     const [ayaanTotal, setAyaanTotal] = useState<number>(0);
     const [riyaanTotal, setRiyaanTotal] = useState<number>(0);
     const [history, setHistory] = useState<GameSession[]>([]);
-    const [sessionResults, setSessionResults] = useState<QuestionResult[]>([]);
+    const [currentResult, setCurrentResult] = useState<MentalMathResult | null>(null);
     const [finalSessionEarnings, setFinalSessionEarnings] = useState(0);
-    const [finalScore, setFinalScore] = useState(0);
-    const [finalWrong, setFinalWrong] = useState(0);
+    const [finalStepsCompleted, setFinalStepsCompleted] = useState(0);
+    const [finalIsCorrect, setFinalIsCorrect] = useState(false);
 
     const getUserProfile = useCallback((name: string | null) => {
         return profiles.find(p => p.player_name === name);
@@ -101,7 +88,7 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
     // ☁️ Cloud Sync
     const syncWithCloud = useCallback(async () => {
         const { data, error } = await supabase
-            .from('subtraction_logs')
+            .from('mentalmath_logs')
             .select('*')
             .order('played_at', { ascending: false })
             .limit(500);
@@ -123,7 +110,7 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
                 wrong: log.wrong_count,
                 earnings: log.earnings,
                 timestamp: new Date(log.played_at).getTime(),
-                results: log.details
+                details: log.details
             };
         });
 
@@ -136,8 +123,8 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
         syncWithCloud();
 
         const channel = supabase
-            .channel('subtraction_logs_live')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'subtraction_logs' }, () => {
+            .channel('mentalmath_logs_live')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'mentalmath_logs' }, () => {
                 syncWithCloud();
             })
             .subscribe();
@@ -173,11 +160,9 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
     const hasPlayedToday = useCallback((player: string | null) => {
         if (!player) return false;
         const todayIST = getISTDateKey(getEffectiveDate());
-        // ✅ Check cloud history first
         const inCloud = history.some(s => s.player === player && getISTDateKey(s.timestamp) === todayIST);
         if (inCloud) return true;
-        // 🛡️ Also check localStorage — guards against mid-quiz refresh
-        return localStorage.getItem(`subtraction_attempt_${player}_${todayIST}`) === 'started';
+        return localStorage.getItem(`mentalmath_attempt_${player}_${todayIST}`) === 'started';
     }, [history, getEffectiveDate]);
 
     const getTodaySession = useCallback((player: string | null) => {
@@ -187,15 +172,15 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
     }, [history, getEffectiveDate]);
 
     // 🏁 Finish Logic
-    const finishQuiz = useCallback(async (fScore: number, fWrong: number, fResults: QuestionResult[]) => {
+    const finishQuiz = useCallback(async (stepsCompleted: number, isCorrect: boolean, result: MentalMathResult) => {
         if (isSubmittingRef.current) return;
         isSubmittingRef.current = true;
 
-        const earnings = (fScore - fWrong) * settings.subtractionMultiplier;
-        setFinalScore(fScore);
-        setFinalWrong(fWrong);
+        const earnings = (isCorrect ? stepsCompleted : -stepsCompleted) * settings.mentalmathMultiplier;
+        setFinalStepsCompleted(stepsCompleted);
+        setFinalIsCorrect(isCorrect);
         setFinalSessionEarnings(earnings);
-        setSessionResults(fResults);
+        setCurrentResult(result);
 
         const effectiveTime = getEffectiveDate().getTime();
 
@@ -203,34 +188,37 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
             const userProfile = getUserProfile(selectedUser);
             const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
 
-            const { error: insertError } = await supabase.from('subtraction_logs').insert({
+            const { error: insertError } = await supabase.from('mentalmath_logs').insert({
                 player_id: playerId,
-                score: fScore,
-                wrong_count: fWrong,
+                score: stepsCompleted,
+                wrong_count: isCorrect ? 0 : 1,
                 earnings,
-                details: fResults,
+                details: result,
                 played_at: new Date(effectiveTime).toISOString()
             });
             if (insertError) {
-                console.error('❌ Subtraction log insert failed:', insertError);
+                console.error('❌ MentalMath log insert failed:', insertError);
             } else {
-                console.log('✅ Subtraction log saved successfully');
+                console.log('✅ MentalMath log saved successfully');
             }
         }
 
-        setSubView(SubtractionSubView.RESULTS);
+        setSubView(MentalMathSubView.RESULTS);
         isSubmittingRef.current = false;
-    }, [selectedUser, getEffectiveDate, getUserProfile, settings.subtractionMultiplier]);
+    }, [selectedUser, getEffectiveDate, getUserProfile, settings.mentalmathMultiplier]);
 
     const {
-        questions,
-        currentIndex,
-        userInput,
-        score,
+        phase,
+        currentStep,
+        stepsCompleted,
         timeLeft,
+        answerTimeLeft,
+        userInput,
         startQuiz: triggerEngineStart,
-        handleKeyClick
-    } = useSubtractionEngine(finishQuiz);
+        handleNext,
+        handleKeyClick,
+        submitAnswer,
+    } = useMentalMathEngine(finishQuiz);
 
     const startQuiz = () => {
         if (!isMarketOpenDay()) return alert('Market closed!');
@@ -238,11 +226,11 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
 
         if (selectedUser) {
             const todayIST = getISTDateKey(getEffectiveDate());
-            localStorage.setItem(`subtraction_attempt_${selectedUser}_${todayIST}`, 'started');
+            localStorage.setItem(`mentalmath_attempt_${selectedUser}_${todayIST}`, 'started');
         }
 
         triggerEngineStart();
-        setSubView(SubtractionSubView.QUIZ);
+        setSubView(MentalMathSubView.QUIZ);
     };
 
     const groupedHistory = useMemo(() => {
@@ -269,24 +257,31 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
         return Object.values(groups).sort((a, b) => b.timestamp - a.timestamp);
     }, [history]);
 
-    const masterQuestionHistory = useMemo(() => {
-        const all: Array<QuestionResult & { player: string; timestamp: number }> = [];
-        history.forEach(s => {
-            const arr = Array.isArray(s.results) ? s.results : Array.isArray(s.results?.results) ? s.results.results : null;
-            if (arr) arr.forEach((q: any) => all.push({ ...q, player: s.player, timestamp: s.timestamp }));
-        });
-        return all.filter(q => q.player === historyFilter).sort((a, b) => b.timestamp - a.timestamp);
+    const historyEntries = useMemo(() => {
+        return history
+            .filter(s => s.player === historyFilter)
+            .map(s => ({
+                player: s.player,
+                timestamp: s.timestamp,
+                stepsCompleted: s.score,
+                isCorrect: s.wrong === 0,
+                correctAnswer: s.details?.correctAnswer ?? 0,
+                userAnswer: s.details?.userAnswer ?? null,
+                earnings: s.earnings,
+                details: s.details
+            }))
+            .sort((a, b) => b.timestamp - a.timestamp);
     }, [history, historyFilter]);
 
     switch (subView) {
-        case SubtractionSubView.HUB:
+        case MentalMathSubView.HUB:
             return (
-                <SubtractionHub
+                <MentalMathHub
                     onBack={onBack}
-                    onNavigate={(v) => setSubView(v as SubtractionSubView)}
+                    onNavigate={(v) => setSubView(v as MentalMathSubView)}
                     onUserSelect={(u) => {
                         setSelectedUser(u);
-                        setSubView(isPinEntryEnabled ? SubtractionSubView.PIN_ENTRY : SubtractionSubView.PRE_ENTRY);
+                        setSubView(isPinEntryEnabled ? MentalMathSubView.PIN_ENTRY : MentalMathSubView.PRE_ENTRY);
                     }}
                     isMarketWorkingDay={isMarketOpenDay()}
                     dateOverride={dateOverride}
@@ -296,76 +291,81 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
                     isUserLocked={(u) => getUserProfile(u)?.is_locked || false}
                 />
             );
-        case SubtractionSubView.PIN_ENTRY:
+        case MentalMathSubView.PIN_ENTRY:
             return (
                 <SubtractionPinEntry
                     selectedUser={selectedUser}
-                    onSuccess={() => setSubView(SubtractionSubView.PRE_ENTRY)}
-                    onBack={() => setSubView(SubtractionSubView.HUB)}
+                    onSuccess={() => setSubView(MentalMathSubView.PRE_ENTRY)}
+                    onBack={() => setSubView(MentalMathSubView.HUB)}
                 />
             );
-        case SubtractionSubView.PRE_ENTRY:
+        case MentalMathSubView.PRE_ENTRY:
             return (
-                <SubtractionPreEntry
+                <MentalMathPreEntry
                     selectedUser={selectedUser}
                     isPlayed={hasPlayedToday(selectedUser)}
                     isMarketWorking={isMarketOpenDay()}
                     todaySession={getTodaySession(selectedUser)}
                     onStart={startQuiz}
                     onReview={(s) => {
-                        setSessionResults(s.results);
-                        setFinalScore(s.score);
-                        setFinalWrong(s.wrong);
+                        setCurrentResult(s.details);
+                        setFinalStepsCompleted(s.score);
+                        setFinalIsCorrect(s.wrong === 0);
                         setFinalSessionEarnings(s.earnings);
-                        setSubView(SubtractionSubView.REVIEW);
+                        setSubView(MentalMathSubView.REVIEW);
                     }}
-                    onBack={() => setSubView(SubtractionSubView.HUB)}
+                    onBack={() => setSubView(MentalMathSubView.HUB)}
                 />
             );
-        case SubtractionSubView.QUIZ:
+        case MentalMathSubView.QUIZ:
             return (
-                <SubtractionQuiz
-                    currentQ={questions[currentIndex]}
-                    currentIndex={currentIndex}
+                <MentalMathQuiz
+                    phase={phase as 'showing' | 'answering'}
+                    currentStep={currentStep}
+                    stepsCompleted={stepsCompleted}
                     timeLeft={timeLeft}
-                    score={score}
+                    answerTimeLeft={answerTimeLeft}
                     userInput={userInput}
+                    onNext={handleNext}
                     onKeyClick={handleKeyClick}
+                    onSubmit={submitAnswer}
                 />
             );
-        case SubtractionSubView.RESULTS:
+        case MentalMathSubView.RESULTS:
             return (
-                <SubtractionResults
+                <MentalMathResults
                     finalSessionEarnings={finalSessionEarnings}
-                    finalScore={finalScore}
-                    finalWrong={finalWrong}
-                    onReview={() => setSubView(SubtractionSubView.REVIEW)}
-                    onExit={() => setSubView(SubtractionSubView.HUB)}
+                    stepsCompleted={finalStepsCompleted}
+                    isCorrect={finalIsCorrect}
+                    correctAnswer={currentResult?.correctAnswer ?? 0}
+                    userAnswer={currentResult?.userAnswer ?? null}
+                    onReview={() => setSubView(MentalMathSubView.REVIEW)}
+                    onExit={() => setSubView(MentalMathSubView.HUB)}
                 />
             );
-        case SubtractionSubView.LOCAL_DASHBOARD:
+        case MentalMathSubView.LOCAL_DASHBOARD:
             return (
-                <SubtractionDashboard
+                <MentalMathDashboard
                     ayaanTotal={ayaanTotal}
                     riyaanTotal={riyaanTotal}
                     groupedHistory={groupedHistory}
-                    onBack={() => setSubView(SubtractionSubView.HUB)}
+                    onBack={() => setSubView(MentalMathSubView.HUB)}
                 />
             );
-        case SubtractionSubView.REVIEW:
+        case MentalMathSubView.REVIEW:
             return (
-                <SubtractionReview
-                    sessionResults={sessionResults}
-                    onBack={() => setSubView(SubtractionSubView.RESULTS)}
+                <MentalMathReview
+                    result={currentResult}
+                    onBack={() => setSubView(MentalMathSubView.RESULTS)}
                 />
             );
-        case SubtractionSubView.MASTER_HISTORY:
+        case MentalMathSubView.MASTER_HISTORY:
             return (
-                <SubtractionHistory
-                    masterQuestionHistory={masterQuestionHistory}
+                <MentalMathHistory
+                    historyEntries={historyEntries}
                     historyFilter={historyFilter}
                     setHistoryFilter={setHistoryFilter}
-                    onBack={() => setSubView(SubtractionSubView.HUB)}
+                    onBack={() => setSubView(MentalMathSubView.HUB)}
                 />
             );
         default:

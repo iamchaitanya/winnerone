@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ViewType } from '../src/types';
-import { PlusCircle, MinusCircle, XCircle, Divide, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart } from 'lucide-react';
+import { PlusCircle, MinusCircle, XCircle, Divide, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart, Brain, Check } from 'lucide-react';
 import { useGameStore } from '../src/store/useGameStore';
 import { isMarketHoliday, getHolidayDetail } from '../src/lib/holidayManager';
+import { supabase } from '../src/lib/supabase';
+import { PLAYER_IDS } from '../src/lib/constants';
 
 interface HomeViewProps {
   onNavigate: (view: ViewType) => void;
@@ -12,6 +14,83 @@ interface HomeViewProps {
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onToggleDark }) => {
   const settings = useGameStore((state) => state.settings);
+
+  // Today's completion status per game
+  type CompletionMap = Record<string, { ayaan: boolean; riyaan: boolean }>;
+  const [completions, setCompletions] = useState<CompletionMap>({});
+
+  const getISTDateKey = useCallback(() => {
+    const now = settings.dateOverride ? new Date(settings.dateOverride) : new Date();
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(now);
+  }, [settings.dateOverride]);
+
+  const fetchCompletions = useCallback(async () => {
+    const todayIST = getISTDateKey();
+    const startOfDay = `${todayIST}T00:00:00+05:30`;
+    const endOfDay = `${todayIST}T23:59:59+05:30`;
+
+    const tables = [
+      { key: 'addition', table: 'addition_logs', dateCol: 'played_at' },
+      { key: 'subtraction', table: 'subtraction_logs', dateCol: 'played_at' },
+      { key: 'multiplication', table: 'multiplication_logs', dateCol: 'played_at' },
+      { key: 'multiplication25', table: 'multiplication25_logs', dateCol: 'played_at' },
+      { key: 'multiply', table: 'multiply_logs', dateCol: 'played_at' },
+      { key: 'divide', table: 'divide_logs', dateCol: 'played_at' },
+      { key: 'mentalmath', table: 'mentalmath_logs', dateCol: 'played_at' },
+      { key: 'nifty', table: 'nifty_logs', dateCol: 'created_at' },
+      { key: 'sensex', table: 'sensex_logs', dateCol: 'created_at' },
+    ];
+
+    const results: CompletionMap = {};
+
+    await Promise.all(tables.map(async ({ key, table, dateCol }) => {
+      const { data } = await supabase
+        .from(table)
+        .select('player_id')
+        .gte(dateCol, startOfDay)
+        .lte(dateCol, endOfDay);
+
+      const playerIds = (data || []).map((r: any) => r.player_id);
+      results[key] = {
+        ayaan: playerIds.includes(PLAYER_IDS.Ayaan),
+        riyaan: playerIds.includes(PLAYER_IDS.Riyaan),
+      };
+    }));
+
+    setCompletions(results);
+  }, [getISTDateKey]);
+
+  useEffect(() => {
+    fetchCompletions();
+
+    // Re-fetch when user navigates back to this page
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchCompletions();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [fetchCompletions]);
+
+  const CompletionBadges: React.FC<{ gameKey: string }> = ({ gameKey }) => {
+    const c = completions[gameKey];
+    if (!c || (!c.ayaan && !c.riyaan)) return null;
+    return (
+      <div className="absolute bottom-2 right-3 flex gap-1">
+        {c.ayaan && (
+          <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-md text-[9px] font-black uppercase">
+            A<Check size={8} />
+          </span>
+        )}
+        {c.riyaan && (
+          <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-md text-[9px] font-black uppercase">
+            R<Check size={8} />
+          </span>
+        )}
+      </div>
+    );
+  };
 
   const [timeLeft, setTimeLeft] = useState<{ days: number, hours: number, minutes: number } | null>(null);
   const [isGameEnded, setIsGameEnded] = useState(false);
@@ -177,6 +256,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                 </div>
               </div>
               {settings.additionMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.additionMultiplier}×</span>}
+              <CompletionBadges gameKey="addition" />
             </button>
 
             <button
@@ -197,6 +277,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                 </div>
               </div>
               {settings.subtractionMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.subtractionMultiplier}×</span>}
+              <CompletionBadges gameKey="subtraction" />
             </button>
 
             <button
@@ -217,6 +298,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                 </div>
               </div>
               {settings.multiplicationMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.multiplicationMultiplier}×</span>}
+              <CompletionBadges gameKey="multiplication" />
             </button>
 
             <button
@@ -237,6 +319,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                 </div>
               </div>
               {settings.multiplication25Multiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.multiplication25Multiplier}×</span>}
+              <CompletionBadges gameKey="multiplication25" />
             </button>
 
             <button
@@ -257,6 +340,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                 </div>
               </div>
               {settings.multiplyMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.multiplyMultiplier}×</span>}
+              <CompletionBadges gameKey="multiply" />
             </button>
 
             <button
@@ -277,11 +361,33 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                 </div>
               </div>
               {settings.divideMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.divideMultiplier}×</span>}
+              <CompletionBadges gameKey="divide" />
+            </button>
+
+            <button
+              onClick={() => settings.mentalmathEnabled && onNavigate(ViewType.MENTALMATH)}
+              className={`relative overflow-hidden flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.mentalmathEnabled
+                ? 'hover:shadow-2xl hover:border-cyan-200 dark:hover:border-cyan-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
+                }`}
+            >
+              <div className="flex items-center gap-6 w-full text-left">
+                <div className={`p-4 rounded-2xl transition-transform ${settings.mentalmathEnabled ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                  <Brain size={32} />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">Mental Math</span>
+                  {!settings.mentalmathEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10} /> Disabled by Admin</span>}
+                  {settings.mentalmathEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Review Dashboard &amp; History</span>}
+                </div>
+              </div>
+              {settings.mentalmathMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.mentalmathMultiplier}×</span>}
+              <CompletionBadges gameKey="mentalmath" />
             </button>
 
             <button
               onClick={() => settings.niftyEnabled && onNavigate(ViewType.NIFTY50)}
-              className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.niftyEnabled
+              className={`relative flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.niftyEnabled
                 ? 'hover:shadow-2xl hover:border-emerald-200 dark:hover:border-emerald-500/50 active:scale-[0.98]'
                 : 'opacity-50 grayscale cursor-not-allowed'
                 }`}
@@ -296,13 +402,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                   {settings.niftyEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Check Picks & Logs</span>}
                 </div>
               </div>
+              <CompletionBadges gameKey="nifty" />
             </button>
 
             {/* ... inside the section tag in HomeView.tsx, below the Nifty 50 button ... */}
 
             <button
               onClick={() => settings.sensexEnabled && onNavigate(ViewType.SENSEX)}
-              className={`flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.sensexEnabled
+              className={`relative flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.sensexEnabled
                 ? 'hover:shadow-2xl hover:border-amber-200 dark:hover:border-amber-500/50 active:scale-[0.98]'
                 : 'opacity-50 grayscale cursor-not-allowed'
                 }`}
@@ -330,6 +437,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                   )}
                 </div>
               </div>
+              <CompletionBadges gameKey="sensex" />
             </button>
             {/* ... followed by the Dashboard button ... */}
 

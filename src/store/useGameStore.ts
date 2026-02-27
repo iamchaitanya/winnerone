@@ -11,6 +11,7 @@ interface GameState {
     multiplication25Enabled: boolean;
     multiplyEnabled: boolean;
     divideEnabled: boolean;
+    mentalmathEnabled: boolean;
     niftyEnabled: boolean;
     sensexEnabled: boolean;
     pinEntryEnabled: boolean;
@@ -20,6 +21,7 @@ interface GameState {
     multiplication25Multiplier: number;
     multiplyMultiplier: number;
     divideMultiplier: number;
+    mentalmathMultiplier: number;
   };
   profiles: Profile[];
   // Actions to update the state
@@ -37,6 +39,7 @@ export const useGameStore = create<GameState>((set) => ({
     multiplication25Enabled: true,
     multiplyEnabled: true,
     divideEnabled: true,
+    mentalmathEnabled: true,
     niftyEnabled: true,
     sensexEnabled: true,
     pinEntryEnabled: true,
@@ -46,6 +49,7 @@ export const useGameStore = create<GameState>((set) => ({
     multiplication25Multiplier: 2,
     multiplyMultiplier: 2,
     divideMultiplier: 3,
+    mentalmathMultiplier: 1,
   },
   profiles: [],
 
