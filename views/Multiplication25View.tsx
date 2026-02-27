@@ -119,7 +119,12 @@ export const Multiplication25View: React.FC<Multiplication25ViewProps> = ({ onBa
         if (selectedUser) {
             const userProfile = getUserProfile(selectedUser);
             const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
-            await supabase.from('multiplication25_logs').insert({ player_id: playerId, score: fScore, wrong_count: fWrong, earnings, details: fResults, played_at: new Date(effectiveTime).toISOString() });
+            const { error: insertError } = await supabase.from('multiplication25_logs').insert({ player_id: playerId, score: fScore, wrong_count: fWrong, earnings, details: fResults, played_at: new Date(effectiveTime).toISOString() });
+            if (insertError) {
+                console.error('❌ Multiplication25 log insert failed:', insertError);
+            } else {
+                console.log('✅ Multiplication25 log saved successfully');
+            }
         }
         setSubView(Mul25SubView.RESULTS);
         isSubmittingRef.current = false;

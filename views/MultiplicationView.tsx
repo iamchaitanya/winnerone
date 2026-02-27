@@ -157,10 +157,15 @@ export const MultiplicationView: React.FC<MultiplicationViewProps> = ({ onBack }
         if (selectedUser) {
             const userProfile = getUserProfile(selectedUser);
             const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
-            await supabase.from('multiplication_logs').insert({
+            const { error: insertError } = await supabase.from('multiplication_logs').insert({
                 player_id: playerId, score: fScore, wrong_count: fWrong, earnings,
                 details: fResults, played_at: new Date(effectiveTime).toISOString()
             });
+            if (insertError) {
+                console.error('❌ Multiplication log insert failed:', insertError);
+            } else {
+                console.log('✅ Multiplication log saved successfully');
+            }
         }
         setSubView(MulSubView.RESULTS);
         isSubmittingRef.current = false;

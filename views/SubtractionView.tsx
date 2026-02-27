@@ -203,7 +203,7 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
             const userProfile = getUserProfile(selectedUser);
             const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
 
-            await supabase.from('subtraction_logs').insert({
+            const { error: insertError } = await supabase.from('subtraction_logs').insert({
                 player_id: playerId,
                 score: fScore,
                 wrong_count: fWrong,
@@ -211,6 +211,11 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
                 details: fResults,
                 played_at: new Date(effectiveTime).toISOString()
             });
+            if (insertError) {
+                console.error('❌ Subtraction log insert failed:', insertError);
+            } else {
+                console.log('✅ Subtraction log saved successfully');
+            }
         }
 
         setSubView(SubtractionSubView.RESULTS);
