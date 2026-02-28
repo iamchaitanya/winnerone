@@ -265,7 +265,12 @@ export const MathMasteryView: React.FC<MathMasteryViewProps> = ({ onBack }) => {
         if (userProfile?.pin) {
             return <MathMasteryPinEntry pin={userProfile.pin} onSuccess={handlePinSuccess} onBack={() => { setView('hub'); setSelectedUser(null); }} />;
         }
-        setView('pre_entry');
+        // If profile loaded but has no pin, skip to pre_entry
+        if (userProfile) {
+            // Use setTimeout to avoid state update during render
+            setTimeout(() => setView('pre_entry'), 0);
+        }
+        return null;
     }
     if (view === 'pre_entry') {
         const todayIST = getISTDateKey(getEffectiveDate());
