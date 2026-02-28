@@ -4,6 +4,7 @@ import { fetchAllLiveReturns } from '../src/lib/stockFetcher';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { useGameStore } from '../src/store/useGameStore';
+import { getISTDateKey } from '../src/lib/dateUtils';
 
 // Import modular components
 import { NiftyHub } from '../src/components/nifty/NiftyHub';
@@ -82,7 +83,6 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
   }, [dateOverride]);
 
   const isWeekend = (date: Date) => date.getDay() === 0 || date.getDay() === 6;
-  const getISTDateKey = (date: Date | number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date));
   const isPublicHoliday = (date: Date) => isMarketHoliday(getISTDateKey(date));
   const isMarketOpenDay = useCallback(() => {
     const d = getEffectiveDate();

@@ -3,6 +3,7 @@ import { supabase } from '../src/lib/supabase';
 import { useGameStore } from '../src/store/useGameStore';
 import { isMarketHoliday } from '../src/lib/holidayManager';
 import { PLAYER_IDS } from '../src/lib/constants';
+import { getISTDateKey } from '../src/lib/dateUtils';
 
 import { MathMasteryHub } from '../src/components/mathmastery/MathMasteryHub';
 import { MathMasteryPreEntry } from '../src/components/mathmastery/MathMasteryPreEntry';
@@ -113,11 +114,7 @@ export const MathMasteryView: React.FC<MathMasteryViewProps> = ({ onBack }) => {
         return new Date();
     }, [dateOverride]);
 
-    const getISTDateKey = useCallback((d: Date) => {
-        return new Intl.DateTimeFormat('en-CA', {
-            timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
-        }).format(d);
-    }, []);
+
 
     const isMarketOpenDay = useCallback(() => {
         const d = getEffectiveDate();
@@ -125,7 +122,7 @@ export const MathMasteryView: React.FC<MathMasteryViewProps> = ({ onBack }) => {
         const isWknd = day === 0 || day === 6;
         const isHoliday = isMarketHoliday(getISTDateKey(d));
         return !isWknd && !isHoliday;
-    }, [getEffectiveDate, getISTDateKey]);
+    }, [getEffectiveDate]);
 
     const hasPlayedToday = useCallback((userName: string) => {
         const todayIST = getISTDateKey(getEffectiveDate());
@@ -136,7 +133,7 @@ export const MathMasteryView: React.FC<MathMasteryViewProps> = ({ onBack }) => {
             const logDate = new Date(log.timestamp);
             return getISTDateKey(logDate) === todayIST;
         });
-    }, [history, getEffectiveDate, getISTDateKey]);
+    }, [history, getEffectiveDate]);
 
     const isUserLocked = useCallback((userName: string) => {
         const profile = getUserProfile(userName);
@@ -225,7 +222,7 @@ export const MathMasteryView: React.FC<MathMasteryViewProps> = ({ onBack }) => {
             }
         });
         return Object.entries(groups).map(([k, v]) => ({ dateKey: k, ...v })).sort((a, b) => b.timestamp - a.timestamp);
-    }, [history, getISTDateKey]);
+    }, [history]);
 
     const [historyFilter, setHistoryFilter] = useState('Ayaan');
     const masterQuestionHistory = useMemo(() => {

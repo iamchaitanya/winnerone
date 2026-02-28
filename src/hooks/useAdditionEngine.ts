@@ -26,6 +26,15 @@ export const useAdditionEngine = (onFinish: (score: number, wrong: number, resul
   const endTimeRef = useRef<number>(0);
   const isSubmittingRef = useRef(false);
 
+  // Refs to avoid stale closures in timer callback
+  const scoreRef = useRef(0);
+  const wrongRef = useRef(0);
+  const resultsRef = useRef<QuestionResult[]>([]);
+  const onFinishRef = useRef(onFinish);
+  const hasFinishedRef = useRef(false);
+
+  useEffect(() => { onFinishRef.current = onFinish; }, [onFinish]);
+
   const generateQuestions = useCallback(() => {
     const newQuestions: Question[] = [];
     for (let i = 0; i < 100; i++) {
@@ -37,15 +46,20 @@ export const useAdditionEngine = (onFinish: (score: number, wrong: number, resul
   }, []);
 
   const startQuiz = () => {
+    scoreRef.current = 0;
+    wrongRef.current = 0;
+    resultsRef.current = [];
+    hasFinishedRef.current = false;
+
     setQuestions(generateQuestions());
     setCurrentIndex(0);
     setUserInput('');
     setScore(0);
     setWrongCount(0);
     setSessionResults([]);
-    
+
     const now = Date.now();
-    endTimeRef.current = now + 100000; 
+    endTimeRef.current = now + 100000;
     setTimeLeft(100);
     setIsActive(true);
     lastQuestionTimeRef.current = now;
@@ -62,9 +76,10 @@ export const useAdditionEngine = (onFinish: (score: number, wrong: number, resul
       if (secondsRemaining <= 0) {
         setTimeLeft(0);
         clearInterval(interval);
-        if (!isSubmittingRef.current) {
-          isSubmittingRef.current = true;
-          onFinish(score, wrongCount, sessionResults);
+        if (!hasFinishedRef.current) {
+          hasFinishedRef.current = true;
+          setIsActive(false);
+          onFinishRef.current(scoreRef.current, wrongRef.current, resultsRef.current);
         }
       } else {
         setTimeLeft(secondsRemaining);
@@ -72,7 +87,7 @@ export const useAdditionEngine = (onFinish: (score: number, wrong: number, resul
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isActive, score, wrongCount, sessionResults, onFinish]);
+  }, [isActive]);
 
   const processAnswer = useCallback((val: string) => {
     const numericAns = parseInt(val, 10);
@@ -82,11 +97,13 @@ export const useAdditionEngine = (onFinish: (score: number, wrong: number, resul
     const timeTaken = (now - lastQuestionTimeRef.current) / 1000;
     lastQuestionTimeRef.current = now;
 
-    const nextScore = correct ? score + 1 : score;
-    const nextWrong = correct ? wrongCount : wrongCount + 1;
-    
-    if (correct) setScore(nextScore);
-    else setWrongCount(nextWrong);
+    if (correct) {
+      scoreRef.current++;
+      setScore(s => s + 1);
+    } else {
+      wrongRef.current++;
+      setWrongCount(w => w + 1);
+    }
 
     const resultEntry = {
       ...currentQ,
@@ -94,9 +111,9 @@ export const useAdditionEngine = (onFinish: (score: number, wrong: number, resul
       isCorrect: correct,
       timeTaken
     };
-    
-    const nextResults = [...sessionResults, resultEntry];
-    setSessionResults(nextResults);
+
+    resultsRef.current = [...resultsRef.current, resultEntry];
+    setSessionResults(prev => [...prev, resultEntry]);
 
     if (currentIndex < 99) {
       setTimeout(() => {
@@ -104,12 +121,12 @@ export const useAdditionEngine = (onFinish: (score: number, wrong: number, resul
         setUserInput('');
       }, 100);
     } else {
-      if (!isSubmittingRef.current) {
-        isSubmittingRef.current = true;
-        onFinish(nextScore, nextWrong, nextResults);
+      if (!hasFinishedRef.current) {
+        hasFinishedRef.current = true;
+        onFinishRef.current(scoreRef.current, wrongRef.current, resultsRef.current);
       }
     }
-  }, [questions, currentIndex, score, wrongCount, sessionResults, onFinish]);
+  }, [questions, currentIndex]);
 
   const handleKeyClick = (val: string) => {
     if (userInput.length < 3) {

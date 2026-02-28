@@ -93,6 +93,7 @@ const App: React.FC = () => {
               'game_enabled_multiply': 'multiplyEnabled',
               'game_enabled_divide': 'divideEnabled',
               'game_enabled_mentalmath': 'mentalmathEnabled',
+              'game_enabled_mathmastery': 'mathmasteryEnabled',
               'game_enabled_nifty': 'niftyEnabled',
               'game_enabled_sensex': 'sensexEnabled',
               'pin_entry_enabled': 'pinEntryEnabled',
@@ -102,7 +103,8 @@ const App: React.FC = () => {
               'game_multiplier_multiplication25': 'multiplication25Multiplier',
               'game_multiplier_multiply': 'multiplyMultiplier',
               'game_multiplier_divide': 'divideMultiplier',
-              'game_multiplier_mentalmath': 'mentalmathMultiplier'
+              'game_multiplier_mentalmath': 'mentalmathMultiplier',
+              'game_multiplier_mathmastery': 'mathmasteryMultiplier'
             };
             const storeKey = keyMap[updatedRow.key];
             if (storeKey) {

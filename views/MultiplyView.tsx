@@ -3,6 +3,7 @@ import { isMarketHoliday } from '../src/lib/holidayManager';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { useGameStore } from '../src/store/useGameStore';
+import { getISTDateKey } from '../src/lib/dateUtils';
 import { useMultiplyEngine, MulQuestionResult } from '../src/hooks/useMultiplyEngine';
 import { MultiplyHub } from '../src/components/multiply/MultiplyHub';
 import { MultiplyPinEntry } from '../src/components/multiply/MultiplyPinEntry';
@@ -20,8 +21,7 @@ enum SV { HUB = 'hub', PIN = 'pin', PRE = 'pre', QUIZ = 'quiz', RESULTS = 'resul
 interface GameSession { id: string; player: string; score: number; wrong: number; earnings: number; timestamp: number; results?: MulQuestionResult[]; }
 interface DailyRecord { dateKey: string; displayDate: string; timestamp: number; ayaanEarnings: number | null; ayaanTime: string | null; riyaanEarnings: number | null; riyaanTime: string | null; }
 
-const getISTDateKey = (date: Date | number) =>
-    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date));
+
 
 export const MultiplyView: React.FC<MultiplyViewProps> = ({ onBack }) => {
     const settings = useGameStore(s => s.settings);

@@ -28,6 +28,15 @@ export const useMultiplyEngine = (
     const endTimeRef = useRef<number>(0);
     const isSubmittingRef = useRef(false);
 
+    // Refs to avoid stale closures in timer callback
+    const scoreRef = useRef(0);
+    const wrongRef = useRef(0);
+    const resultsRef = useRef<MulQuestionResult[]>([]);
+    const onFinishRef = useRef(onFinish);
+    const hasFinishedRef = useRef(false);
+
+    useEffect(() => { onFinishRef.current = onFinish; }, [onFinish]);
+
     const generateQuestions = useCallback((): MulQuestion[] => {
         const pool: MulQuestion[] = [];
         for (let i = 0; i < 100; i++) {
@@ -39,6 +48,11 @@ export const useMultiplyEngine = (
     }, []);
 
     const startQuiz = () => {
+        scoreRef.current = 0;
+        wrongRef.current = 0;
+        resultsRef.current = [];
+        hasFinishedRef.current = false;
+
         setQuestions(generateQuestions());
         setCurrentIndex(0);
         setUserInput('');
@@ -61,16 +75,17 @@ export const useMultiplyEngine = (
             if (secondsRemaining <= 0) {
                 setTimeLeft(0);
                 clearInterval(interval);
-                if (!isSubmittingRef.current) {
-                    isSubmittingRef.current = true;
-                    onFinish(score, wrongCount, sessionResults);
+                if (!hasFinishedRef.current) {
+                    hasFinishedRef.current = true;
+                    setIsActive(false);
+                    onFinishRef.current(scoreRef.current, wrongRef.current, resultsRef.current);
                 }
             } else {
                 setTimeLeft(secondsRemaining);
             }
         }, 1000);
         return () => clearInterval(interval);
-    }, [isActive, score, wrongCount, sessionResults, onFinish]);
+    }, [isActive]);
 
     const processAnswer = useCallback((val: string) => {
         const numericAns = parseInt(val, 10);
@@ -80,24 +95,27 @@ export const useMultiplyEngine = (
         const timeTaken = (now - lastQuestionTimeRef.current) / 1000;
         lastQuestionTimeRef.current = now;
 
-        const nextScore = correct ? score + 1 : score;
-        const nextWrong = correct ? wrongCount : wrongCount + 1;
-        if (correct) setScore(nextScore);
-        else setWrongCount(nextWrong);
+        if (correct) {
+            scoreRef.current++;
+            setScore(s => s + 1);
+        } else {
+            wrongRef.current++;
+            setWrongCount(w => w + 1);
+        }
 
         const resultEntry: MulQuestionResult = { ...currentQ, userAnswer: numericAns, isCorrect: correct, timeTaken };
-        const nextResults = [...sessionResults, resultEntry];
-        setSessionResults(nextResults);
+        resultsRef.current = [...resultsRef.current, resultEntry];
+        setSessionResults(prev => [...prev, resultEntry]);
 
         if (currentIndex < 99) {
             setTimeout(() => { setCurrentIndex(i => i + 1); setUserInput(''); }, 100);
         } else {
-            if (!isSubmittingRef.current) {
-                isSubmittingRef.current = true;
-                onFinish(nextScore, nextWrong, nextResults);
+            if (!hasFinishedRef.current) {
+                hasFinishedRef.current = true;
+                onFinishRef.current(scoreRef.current, wrongRef.current, resultsRef.current);
             }
         }
-    }, [questions, currentIndex, score, wrongCount, sessionResults, onFinish]);
+    }, [questions, currentIndex]);
 
     const handleKeyClick = (val: string) => {
         if (userInput.length < 4) {

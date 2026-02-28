@@ -28,7 +28,27 @@ export interface StockData {
  */
 
 export interface AppSetting {
-  key: 'addition_date_override' | 'game_enabled_addition' | 'game_enabled_nifty' | 'game_enabled_sensex' | 'pin_entry_enabled';
+  key:
+  | 'addition_date_override'
+  | 'game_enabled_addition'
+  | 'game_enabled_subtraction'
+  | 'game_enabled_multiplication'
+  | 'game_enabled_multiplication25'
+  | 'game_enabled_multiply'
+  | 'game_enabled_divide'
+  | 'game_enabled_mentalmath'
+  | 'game_enabled_mathmastery'
+  | 'game_enabled_nifty'
+  | 'game_enabled_sensex'
+  | 'pin_entry_enabled'
+  | 'game_multiplier_addition'
+  | 'game_multiplier_subtraction'
+  | 'game_multiplier_multiplication'
+  | 'game_multiplier_multiplication25'
+  | 'game_multiplier_multiply'
+  | 'game_multiplier_divide'
+  | 'game_multiplier_mentalmath'
+  | 'game_multiplier_mathmastery';
   value: string | boolean | null;
 }
 

@@ -34,6 +34,7 @@ export const useMentalMathEngine = (
     const endTimeRef = useRef<number>(0);
     const answerEndTimeRef = useRef<number>(0);
     const isSubmittingRef = useRef(false);
+    const userInputRef = useRef('');
     const runningTotalRef = useRef(0);
     const stepsRef = useRef<MathStep[]>([]);
     const stepsCompletedRef = useRef(0);
@@ -126,6 +127,7 @@ export const useMentalMathEngine = (
         setStepsCompleted(1);
         stepsCompletedRef.current = 1;
         setUserInput('');
+        userInputRef.current = '';
         setAnswerTimeLeft(5);
 
         const now = Date.now();
@@ -213,7 +215,8 @@ export const useMentalMathEngine = (
         if (isSubmittingRef.current) return;
         isSubmittingRef.current = true;
 
-        const numericAnswer = userInput.trim() === '' ? null : parseFloat(userInput);
+        const currentInput = userInputRef.current;
+        const numericAnswer = currentInput.trim() === '' ? null : parseFloat(currentInput);
         const correctAnswer = runningTotalRef.current;
         const isCorrect = numericAnswer === correctAnswer;
         const count = stepsCompletedRef.current;
@@ -228,7 +231,7 @@ export const useMentalMathEngine = (
 
         setPhase('finished');
         onFinish(count, isCorrect, result);
-    }, [userInput, onFinish]);
+    }, [onFinish]);
 
     const handleKeyClick = (val: string) => {
         if (phase !== 'answering') return;
@@ -239,17 +242,28 @@ export const useMentalMathEngine = (
         }
 
         if (val === '-') {
-            if (userInput.length === 0) setUserInput('-');
+            if (userInput.length === 0) {
+                setUserInput('-');
+                userInputRef.current = '-';
+            }
             return;
         }
 
         if (val === 'DEL') {
-            setUserInput(prev => prev.slice(0, -1));
+            setUserInput(prev => {
+                const next = prev.slice(0, -1);
+                userInputRef.current = next;
+                return next;
+            });
             return;
         }
 
         if (userInput.length < 6) {
-            setUserInput(prev => prev + val);
+            setUserInput(prev => {
+                const next = prev + val;
+                userInputRef.current = next;
+                return next;
+            });
         }
     };
 

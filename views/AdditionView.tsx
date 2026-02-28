@@ -3,6 +3,7 @@ import { isMarketHoliday } from '../src/lib/holidayManager';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { useGameStore } from '../src/store/useGameStore';
+import { getISTDateKey } from '../src/lib/dateUtils';
 
 // Hook Import
 import { useAdditionEngine } from '../src/hooks/useAdditionEngine';
@@ -64,15 +65,7 @@ interface DailyRecord {
   riyaanTime: string | null;
 }
 
-// 🌐 Helper: Strict IST Date Key (YYYY-MM-DD)
-const getISTDateKey = (date: Date | number) => {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).format(new Date(date));
-};
+
 
 export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const settings = useGameStore((state) => state.settings);
@@ -177,7 +170,10 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
   const hasPlayedToday = useCallback((player: string | null) => {
     if (!player) return false;
     const todayIST = getISTDateKey(getEffectiveDate());
-    return history.some(s => s.player === player && getISTDateKey(s.timestamp) === todayIST);
+    const inCloud = history.some(s => s.player === player && getISTDateKey(s.timestamp) === todayIST);
+    if (inCloud) return true;
+    // 🛡️ Crash protection: also check localStorage for in-progress attempts
+    return localStorage.getItem(`addition_attempt_${player}_${todayIST}`) === 'started';
   }, [history, getEffectiveDate]);
 
   const getTodaySession = useCallback((player: string | null) => {

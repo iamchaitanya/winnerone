@@ -5,6 +5,7 @@ import { useGameStore } from '../src/store/useGameStore';
 import { isMarketHoliday, getHolidayDetail } from '../src/lib/holidayManager';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
+import { getISTDateKey } from '../src/lib/dateUtils';
 
 interface HomeViewProps {
   onNavigate: (view: ViewType) => void;
@@ -19,15 +20,13 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
   type CompletionMap = Record<string, { ayaan: boolean; riyaan: boolean }>;
   const [completions, setCompletions] = useState<CompletionMap>({});
 
-  const getISTDateKey = useCallback(() => {
+  const getISTDateKeyToday = useCallback(() => {
     const now = settings.dateOverride ? new Date(settings.dateOverride) : new Date();
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
-    }).format(now);
+    return getISTDateKey(now);
   }, [settings.dateOverride]);
 
   const fetchCompletions = useCallback(async () => {
-    const todayIST = getISTDateKey();
+    const todayIST = getISTDateKeyToday();
     const startOfDay = `${todayIST}T00:00:00+05:30`;
     const endOfDay = `${todayIST}T23:59:59+05:30`;
 
@@ -61,7 +60,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
     }));
 
     setCompletions(results);
-  }, [getISTDateKey]);
+  }, [getISTDateKeyToday]);
 
   useEffect(() => {
     fetchCompletions();

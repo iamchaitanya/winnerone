@@ -3,7 +3,7 @@
 interface UpstoxHoliday {
   date: string;
   description: string;
-  holiday_type?: string; 
+  holiday_type?: string;
 }
 
 interface UpstoxResponse {
@@ -31,14 +31,14 @@ export async function fetchAndCacheHolidays(): Promise<void> {
     if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
 
     const json: UpstoxResponse = await response.json();
-    
+
     let fetchedHolidays: Record<string, { description: string; type: string }> = {};
     if (json && Array.isArray(json.data)) {
       json.data.forEach((h: UpstoxHoliday) => {
         if (h.date) {
           fetchedHolidays[h.date] = {
             description: h.description || 'Market Holiday',
-            type: h.holiday_type || 'Trading' 
+            type: h.holiday_type || 'Trading'
           };
         }
       });
@@ -55,7 +55,7 @@ export function isMarketHoliday(dateString: string): boolean {
   const dateObj = new Date(dateString);
   const dayOfWeek = dateObj.getDay();
   // Saturday = 6, Sunday = 0
-  if (dayOfWeek === 0 || dayOfWeek === 6) return true; 
+  if (dayOfWeek === 0 || dayOfWeek === 6) return true;
   return !!(inMemoryHolidays && inMemoryHolidays[dateString]);
 }
 
@@ -65,7 +65,7 @@ export function isMarketHoliday(dateString: string): boolean {
 export function getHolidayDetail(dateString: string): HolidayDetail | null {
   const dateObj = new Date(dateString);
   const dayOfWeek = dateObj.getDay();
-  
+
   if (dayOfWeek === 0) return { name: "Sunday", type: "Weekend" };
   if (dayOfWeek === 6) return { name: "Saturday", type: "Weekend" };
 
@@ -73,7 +73,7 @@ export function getHolidayDetail(dateString: string): HolidayDetail | null {
     const holiday = inMemoryHolidays[dateString];
     return {
       name: holiday.description,
-      type: holiday.type as any
+      type: holiday.type as HolidayDetail['type']
     };
   }
 

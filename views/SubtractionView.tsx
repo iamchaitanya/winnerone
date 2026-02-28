@@ -3,6 +3,7 @@ import { isMarketHoliday } from '../src/lib/holidayManager';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { useGameStore } from '../src/store/useGameStore';
+import { getISTDateKey } from '../src/lib/dateUtils';
 
 // Hook
 import { useSubtractionEngine } from '../src/hooks/useSubtractionEngine';
@@ -64,15 +65,7 @@ interface DailyRecord {
     riyaanTime: string | null;
 }
 
-// 🌐 Strict IST Date Key (YYYY-MM-DD) — same as AdditionView
-const getISTDateKey = (date: Date | number) => {
-    return new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Kolkata',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    }).format(new Date(date));
-};
+
 
 export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
     const settings = useGameStore((state) => state.settings);

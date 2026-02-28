@@ -3,6 +3,7 @@ import { isMarketHoliday } from '../src/lib/holidayManager';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { useGameStore } from '../src/store/useGameStore';
+import { getISTDateKey } from '../src/lib/dateUtils';
 
 // Hook
 import { useMentalMathEngine, MentalMathResult } from '../src/hooks/useMentalMathEngine';
@@ -52,14 +53,7 @@ interface DailyRecord {
     riyaanTime: string | null;
 }
 
-const getISTDateKey = (date: Date | number) => {
-    return new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Kolkata',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    }).format(new Date(date));
-};
+
 
 export const MentalMathView: React.FC<MentalMathViewProps> = ({ onBack }) => {
     const settings = useGameStore((state) => state.settings);
