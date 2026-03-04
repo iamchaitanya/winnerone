@@ -49,6 +49,18 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
       'game_multiplier_divide': 'divideMultiplier',
       'game_multiplier_mentalmath': 'mentalmathMultiplier',
       'game_multiplier_mathmastery': 'mathmasteryMultiplier',
+      'game_enabled_sudoku': 'sudokuEnabled',
+      'game_enabled_memory': 'memoryEnabled',
+      'game_enabled_wordpower': 'wordpowerEnabled',
+      'game_enabled_barron800': 'barron800Enabled',
+      'game_enabled_manhattan500': 'manhattan500Enabled',
+      'game_multiplier_nifty': 'niftyMultiplier',
+      'game_multiplier_sensex': 'sensexMultiplier',
+      'game_multiplier_sudoku': 'sudokuMultiplier',
+      'game_multiplier_memory': 'memoryMultiplier',
+      'game_multiplier_wordpower': 'wordpowerMultiplier',
+      'game_multiplier_barron800': 'barron800Multiplier',
+      'game_multiplier_manhattan500': 'manhattan500Multiplier',
     };
 
     // Optimistic UI update via Zustand
@@ -94,6 +106,11 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
   const toggleMathMastery = () => handleUpdateSetting('game_enabled_mathmastery', !settings.mathmasteryEnabled);
   const toggleNifty = () => handleUpdateSetting('game_enabled_nifty', !settings.niftyEnabled);
   const toggleSensex = () => handleUpdateSetting('game_enabled_sensex', !settings.sensexEnabled);
+  const toggleSudoku = () => handleUpdateSetting('game_enabled_sudoku', !settings.sudokuEnabled);
+  const toggleMemory = () => handleUpdateSetting('game_enabled_memory', !settings.memoryEnabled);
+  const toggleWordPower = () => handleUpdateSetting('game_enabled_wordpower', !settings.wordpowerEnabled);
+  const toggleBarron800 = () => handleUpdateSetting('game_enabled_barron800', !settings.barron800Enabled);
+  const toggleManhattan500 = () => handleUpdateSetting('game_enabled_manhattan500', !settings.manhattan500Enabled);
   const togglePinEntry = () => handleUpdateSetting('pin_entry_enabled', !settings.pinEntryEnabled);
   const updateDateOverride = (val: string) => handleUpdateSetting('addition_date_override', val);
   const clearDateOverride = () => handleUpdateSetting('addition_date_override', null);
@@ -288,6 +305,36 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
                 {settings.sensexEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
               </button>
             </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Sudoku</span>
+              <button onClick={toggleSudoku}>
+                {settings.sudokuEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Memory</span>
+              <button onClick={toggleMemory}>
+                {settings.memoryEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Word Power</span>
+              <button onClick={toggleWordPower}>
+                {settings.wordpowerEnabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Barron 800</span>
+              <button onClick={toggleBarron800}>
+                {settings.barron800Enabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Manhattan 500</span>
+              <button onClick={toggleManhattan500}>
+                {settings.manhattan500Enabled ? <ToggleRight size={32} className="text-emerald-500" /> : <ToggleLeft size={32} className="text-slate-300" />}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -308,6 +355,13 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
               { label: 'Divide', key: 'game_multiplier_divide', value: settings.divideMultiplier },
               { label: 'Mental Math', key: 'game_multiplier_mentalmath', value: settings.mentalmathMultiplier },
               { label: 'Math Mastery', key: 'game_multiplier_mathmastery', value: settings.mathmasteryMultiplier },
+              { label: 'Nifty 50', key: 'game_multiplier_nifty', value: settings.niftyMultiplier },
+              { label: 'Sensex', key: 'game_multiplier_sensex', value: settings.sensexMultiplier },
+              { label: 'Sudoku', key: 'game_multiplier_sudoku', value: settings.sudokuMultiplier },
+              { label: 'Memory', key: 'game_multiplier_memory', value: settings.memoryMultiplier },
+              { label: 'Word Power', key: 'game_multiplier_wordpower', value: settings.wordpowerMultiplier },
+              { label: 'Barron 800', key: 'game_multiplier_barron800', value: settings.barron800Multiplier },
+              { label: 'Manhattan 500', key: 'game_multiplier_manhattan500', value: settings.manhattan500Multiplier },
             ].map(({ label, key, value }) => (
               <div key={key} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
                 <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">{label}</span>

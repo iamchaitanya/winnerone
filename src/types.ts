@@ -10,6 +10,12 @@ export enum ViewType {
   MATHMASTERY = 'mathmastery',
   NIFTY50 = 'nifty50',
   SENSEX = 'sensex',
+  SUDOKU = 'sudoku',
+  MEMORY = 'memory',
+  WORDPOWER = 'wordpower',
+  BARRON800 = 'barron800',
+  MANHATTAN500 = 'manhattan500',
+  DAILYHISTORY = 'dailyhistory',
   DASHBOARD = 'dashboard',
   ADMIN = 'admin'
 }

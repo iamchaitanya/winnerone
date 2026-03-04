@@ -15,6 +15,11 @@ interface PlayerScoreSummary {
   divide_total: number;
   mentalmath_total: number;
   mathmastery_total: number;
+  sudoku_total: number;
+  memory_total: number;
+  wordpower_total: number;
+  barron800_total: number;
+  manhattan500_total: number;
   grand_total: number;
 }
 
@@ -46,6 +51,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
   const [ayaanMathmastery, setAyaanMathmastery] = useState(0);
   const [riyaanMathmastery, setRiyaanMathmastery] = useState(0);
 
+  const [ayaanSudoku, setAyaanSudoku] = useState(0);
+  const [riyaanSudoku, setRiyaanSudoku] = useState(0);
+  const [ayaanMemory, setAyaanMemory] = useState(0);
+  const [riyaanMemory, setRiyaanMemory] = useState(0);
+  const [ayaanWordPower, setAyaanWordPower] = useState(0);
+  const [riyaanWordPower, setRiyaanWordPower] = useState(0);
+  const [ayaanBarron800, setAyaanBarron800] = useState(0);
+  const [riyaanBarron800, setRiyaanBarron800] = useState(0);
+  const [ayaanManhattan500, setAyaanManhattan500] = useState(0);
+  const [riyaanManhattan500, setRiyaanManhattan500] = useState(0);
+
   const fetchScores = useCallback(async () => {
     setLoading(true);
     try {
@@ -72,6 +88,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
           setAyaanDivide(ayaan.divide_total || 0);
           setAyaanMentalmath(ayaan.mentalmath_total || 0);
           setAyaanMathmastery(ayaan.mathmastery_total || 0);
+          setAyaanSudoku(ayaan.sudoku_total || 0);
+          setAyaanMemory(ayaan.memory_total || 0);
+          setAyaanWordPower(ayaan.wordpower_total || 0);
+          setAyaanBarron800(ayaan.barron800_total || 0);
+          setAyaanManhattan500(ayaan.manhattan500_total || 0);
         }
         if (riyaan) {
           setRiyaanAddition(riyaan.addition_total);
@@ -84,6 +105,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
           setRiyaanDivide(riyaan.divide_total || 0);
           setRiyaanMentalmath(riyaan.mentalmath_total || 0);
           setRiyaanMathmastery(riyaan.mathmastery_total || 0);
+          setRiyaanSudoku(riyaan.sudoku_total || 0);
+          setRiyaanMemory(riyaan.memory_total || 0);
+          setRiyaanWordPower(riyaan.wordpower_total || 0);
+          setRiyaanBarron800(riyaan.barron800_total || 0);
+          setRiyaanManhattan500(riyaan.manhattan500_total || 0);
         }
       }
     } catch (error) {
@@ -109,14 +135,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mathmastery_logs' }, fetchScores)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'nifty_logs' }, fetchScores)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sensex_logs' }, fetchScores)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sudoku_logs' }, fetchScores)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'memory_logs' }, fetchScores)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wordpower_logs' }, fetchScores)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'barron800_logs' }, fetchScores)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'manhattan500_logs' }, fetchScores)
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [fetchScores]);
 
   // Update total calculations to include Sensex and Math Mastery
-  const ayaanTotal = ayaanAddition + ayaanNifty + ayaanSensex + ayaanSubtraction + ayaanMultiplication + ayaanMultiplication25 + ayaanMultiply + ayaanDivide + ayaanMentalmath + ayaanMathmastery;
-  const riyaanTotal = riyaanAddition + riyaanNifty + riyaanSensex + riyaanSubtraction + riyaanMultiplication + riyaanMultiplication25 + riyaanMultiply + riyaanDivide + riyaanMentalmath + riyaanMathmastery;
+  const ayaanTotal = ayaanAddition + ayaanNifty + ayaanSensex + ayaanSubtraction + ayaanMultiplication + ayaanMultiplication25 + ayaanMultiply + ayaanDivide + ayaanMentalmath + ayaanMathmastery + ayaanSudoku + ayaanMemory + ayaanWordPower + ayaanBarron800 + ayaanManhattan500;
+  const riyaanTotal = riyaanAddition + riyaanNifty + riyaanSensex + riyaanSubtraction + riyaanMultiplication + riyaanMultiplication25 + riyaanMultiply + riyaanDivide + riyaanMentalmath + riyaanMathmastery + riyaanSudoku + riyaanMemory + riyaanWordPower + riyaanBarron800 + riyaanManhattan500;
 
   const isAyaanLeading = ayaanTotal >= riyaanTotal;
   const leaderBaseTotal = isAyaanLeading ? ayaanTotal : riyaanTotal;
@@ -252,6 +283,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                   {formatCurrency(ayaanSensex)}
                 </p>
               </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Sudoku</p>
+                <p className={`text-sm font-black ${ayaanSudoku < 0 ? 'text-rose-500' : 'text-fuchsia-600 dark:text-fuchsia-400'}`}>
+                  {loading ? '...' : formatCurrency(ayaanSudoku)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Memory</p>
+                <p className={`text-sm font-black ${ayaanMemory < 0 ? 'text-rose-500' : 'text-purple-600 dark:text-purple-400'}`}>
+                  {loading ? '...' : formatCurrency(ayaanMemory)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Word Power</p>
+                <p className={`text-sm font-black ${ayaanWordPower < 0 ? 'text-rose-500' : 'text-blue-600 dark:text-blue-400'}`}>
+                  {loading ? '...' : formatCurrency(ayaanWordPower)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Barron 800</p>
+                <p className={`text-sm font-black ${ayaanBarron800 < 0 ? 'text-rose-500' : 'text-red-600 dark:text-red-400'}`}>
+                  {loading ? '...' : formatCurrency(ayaanBarron800)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Manhattan 500</p>
+                <p className={`text-sm font-black ${ayaanManhattan500 < 0 ? 'text-rose-500' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                  {loading ? '...' : formatCurrency(ayaanManhattan500)}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -325,6 +386,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onBack }) => {
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Sensex</p>
                 <p className={`text-sm font-black ${riyaanSensex < 0 ? 'text-rose-500' : 'text-amber-600 dark:text-amber-400'}`}>
                   {formatCurrency(riyaanSensex)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Sudoku</p>
+                <p className={`text-sm font-black ${riyaanSudoku < 0 ? 'text-rose-500' : 'text-fuchsia-600 dark:text-fuchsia-400'}`}>
+                  {loading ? '...' : formatCurrency(riyaanSudoku)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Memory</p>
+                <p className={`text-sm font-black ${riyaanMemory < 0 ? 'text-rose-500' : 'text-purple-600 dark:text-purple-400'}`}>
+                  {loading ? '...' : formatCurrency(riyaanMemory)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Word Power</p>
+                <p className={`text-sm font-black ${riyaanWordPower < 0 ? 'text-rose-500' : 'text-blue-600 dark:text-blue-400'}`}>
+                  {loading ? '...' : formatCurrency(riyaanWordPower)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Barron 800</p>
+                <p className={`text-sm font-black ${riyaanBarron800 < 0 ? 'text-rose-500' : 'text-red-600 dark:text-red-400'}`}>
+                  {loading ? '...' : formatCurrency(riyaanBarron800)}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Manhattan 500</p>
+                <p className={`text-sm font-black ${riyaanManhattan500 < 0 ? 'text-rose-500' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                  {loading ? '...' : formatCurrency(riyaanManhattan500)}
                 </p>
               </div>
             </div>

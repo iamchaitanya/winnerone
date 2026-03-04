@@ -15,6 +15,11 @@ interface GameState {
     mathmasteryEnabled: boolean;
     niftyEnabled: boolean;
     sensexEnabled: boolean;
+    sudokuEnabled: boolean;
+    memoryEnabled: boolean;
+    wordpowerEnabled: boolean;
+    barron800Enabled: boolean;
+    manhattan500Enabled: boolean;
     pinEntryEnabled: boolean;
     additionMultiplier: number;
     subtractionMultiplier: number;
@@ -24,6 +29,13 @@ interface GameState {
     divideMultiplier: number;
     mentalmathMultiplier: number;
     mathmasteryMultiplier: number;
+    niftyMultiplier: number;
+    sensexMultiplier: number;
+    sudokuMultiplier: number;
+    memoryMultiplier: number;
+    wordpowerMultiplier: number;
+    barron800Multiplier: number;
+    manhattan500Multiplier: number;
   };
   profiles: Profile[];
   // Actions to update the state
@@ -45,6 +57,11 @@ export const useGameStore = create<GameState>((set) => ({
     mathmasteryEnabled: true,
     niftyEnabled: true,
     sensexEnabled: true,
+    sudokuEnabled: true,
+    memoryEnabled: true,
+    wordpowerEnabled: true,
+    barron800Enabled: true,
+    manhattan500Enabled: true,
     pinEntryEnabled: true,
     additionMultiplier: 1,
     subtractionMultiplier: 1,
@@ -54,6 +71,13 @@ export const useGameStore = create<GameState>((set) => ({
     divideMultiplier: 3,
     mentalmathMultiplier: 1,
     mathmasteryMultiplier: 1,
+    niftyMultiplier: 1,
+    sensexMultiplier: 1,
+    sudokuMultiplier: 1,
+    memoryMultiplier: 1,
+    wordpowerMultiplier: 1,
+    barron800Multiplier: 1,
+    manhattan500Multiplier: 1,
   },
   profiles: [],
 

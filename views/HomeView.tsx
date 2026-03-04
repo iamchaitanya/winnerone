@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ViewType } from '../src/types';
-import { PlusCircle, MinusCircle, XCircle, Divide, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart, Brain, BrainCircuit, Check } from 'lucide-react';
+import { PlusCircle, MinusCircle, XCircle, Divide, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart, Brain, BrainCircuit, Check, Puzzle, Layers, BookOpen, GraduationCap, Library, CalendarDays } from 'lucide-react';
 import { useGameStore } from '../src/store/useGameStore';
 import { isMarketHoliday, getHolidayDetail } from '../src/lib/holidayManager';
 import { supabase } from '../src/lib/supabase';
@@ -41,6 +41,11 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
       { key: 'mathmastery', table: 'mathmastery_logs', dateCol: 'played_at' },
       { key: 'nifty', table: 'nifty_logs', dateCol: 'created_at' },
       { key: 'sensex', table: 'sensex_logs', dateCol: 'created_at' },
+      { key: 'sudoku', table: 'sudoku_logs', dateCol: 'played_at' },
+      { key: 'memory', table: 'memory_logs', dateCol: 'played_at' },
+      { key: 'wordpower', table: 'wordpower_logs', dateCol: 'played_at' },
+      { key: 'barron800', table: 'barron800_logs', dateCol: 'played_at' },
+      { key: 'manhattan500', table: 'manhattan500_logs', dateCol: 'played_at' },
     ];
 
     const results: CompletionMap = {};
@@ -426,6 +431,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                   {settings.niftyEnabled && marketStatus.isClosed && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Check Picks & Logs</span>}
                 </div>
               </div>
+              {settings.niftyMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.niftyMultiplier}×</span>}
               <CompletionBadges gameKey="nifty" />
             </button>
 
@@ -461,10 +467,117 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
                   )}
                 </div>
               </div>
+              {settings.sensexMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.sensexMultiplier}×</span>}
               <CompletionBadges gameKey="sensex" />
             </button>
             {/* ... followed by the Dashboard button ... */}
 
+            {/* === NEW MODULES === */}
+
+            <button
+              onClick={() => settings.sudokuEnabled && onNavigate(ViewType.SUDOKU)}
+              className={`relative overflow-hidden flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.sudokuEnabled
+                ? 'hover:shadow-2xl hover:border-purple-200 dark:hover:border-purple-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
+                }`}
+            >
+              <div className="flex items-center gap-6 w-full text-left">
+                <div className={`p-4 rounded-2xl transition-transform ${settings.sudokuEnabled ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}><Puzzle size={32} /></div>
+                <div className="flex flex-col items-start">
+                  <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">SUDOKU</span>
+                  {!settings.sudokuEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10} /> Disabled by Admin</span>}
+                  {settings.sudokuEnabled && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">6×6 Logic Puzzle</span>}
+                </div>
+              </div>
+              {settings.sudokuMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.sudokuMultiplier}×</span>}
+              <CompletionBadges gameKey="sudoku" />
+            </button>
+
+            <button
+              onClick={() => settings.memoryEnabled && onNavigate(ViewType.MEMORY)}
+              className={`relative overflow-hidden flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.memoryEnabled
+                ? 'hover:shadow-2xl hover:border-fuchsia-200 dark:hover:border-fuchsia-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
+                }`}
+            >
+              <div className="flex items-center gap-6 w-full text-left">
+                <div className={`p-4 rounded-2xl transition-transform ${settings.memoryEnabled ? 'bg-fuchsia-50 dark:bg-fuchsia-900/30 text-fuchsia-600 dark:text-fuchsia-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}><Layers size={32} /></div>
+                <div className="flex flex-col items-start">
+                  <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">MEMORY</span>
+                  {!settings.memoryEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10} /> Disabled by Admin</span>}
+                  {settings.memoryEnabled && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Number Recall Game</span>}
+                </div>
+              </div>
+              {settings.memoryMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.memoryMultiplier}×</span>}
+              <CompletionBadges gameKey="memory" />
+            </button>
+
+            <button
+              onClick={() => settings.wordpowerEnabled && onNavigate(ViewType.WORDPOWER)}
+              className={`relative overflow-hidden flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.wordpowerEnabled
+                ? 'hover:shadow-2xl hover:border-lime-200 dark:hover:border-lime-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
+                }`}
+            >
+              <div className="flex items-center gap-6 w-full text-left">
+                <div className={`p-4 rounded-2xl transition-transform ${settings.wordpowerEnabled ? 'bg-lime-50 dark:bg-lime-900/30 text-lime-600 dark:text-lime-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}><BookOpen size={32} /></div>
+                <div className="flex flex-col items-start">
+                  <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">WORD POWER</span>
+                  {!settings.wordpowerEnabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10} /> Disabled by Admin</span>}
+                  {settings.wordpowerEnabled && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Root Words & Etymology</span>}
+                </div>
+              </div>
+              {settings.wordpowerMultiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.wordpowerMultiplier}×</span>}
+              <CompletionBadges gameKey="wordpower" />
+            </button>
+
+            <button
+              onClick={() => settings.barron800Enabled && onNavigate(ViewType.BARRON800)}
+              className={`relative overflow-hidden flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.barron800Enabled
+                ? 'hover:shadow-2xl hover:border-blue-200 dark:hover:border-blue-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
+                }`}
+            >
+              <div className="flex items-center gap-6 w-full text-left">
+                <div className={`p-4 rounded-2xl transition-transform ${settings.barron800Enabled ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}><GraduationCap size={32} /></div>
+                <div className="flex flex-col items-start">
+                  <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">BARRON 800</span>
+                  {!settings.barron800Enabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10} /> Disabled by Admin</span>}
+                  {settings.barron800Enabled && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">GRE Vocabulary</span>}
+                </div>
+              </div>
+              {settings.barron800Multiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.barron800Multiplier}×</span>}
+              <CompletionBadges gameKey="barron800" />
+            </button>
+
+            <button
+              onClick={() => settings.manhattan500Enabled && onNavigate(ViewType.MANHATTAN500)}
+              className={`relative overflow-hidden flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none transition-all group ${settings.manhattan500Enabled
+                ? 'hover:shadow-2xl hover:border-cyan-200 dark:hover:border-cyan-500/50 active:scale-[0.98]'
+                : 'opacity-50 grayscale cursor-not-allowed'
+                }`}
+            >
+              <div className="flex items-center gap-6 w-full text-left">
+                <div className={`p-4 rounded-2xl transition-transform ${settings.manhattan500Enabled ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}><Library size={32} /></div>
+                <div className="flex flex-col items-start">
+                  <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">MANHATTAN 500</span>
+                  {!settings.manhattan500Enabled && <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 uppercase tracking-widest mt-1"><ShieldAlert size={10} /> Disabled by Admin</span>}
+                  {settings.manhattan500Enabled && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Prep Vocabulary</span>}
+                </div>
+              </div>
+              {settings.manhattan500Multiplier !== 1 && <span className="absolute top-2 right-3 text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg tabular-nums">₹{settings.manhattan500Multiplier}×</span>}
+              <CompletionBadges gameKey="manhattan500" />
+            </button>
+
+            <button
+              onClick={() => onNavigate(ViewType.DAILYHISTORY)}
+              className="flex flex-row items-center px-6 h-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none hover:shadow-2xl hover:border-amber-200 dark:hover:border-amber-500/50 transition-all group active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-6">
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-2xl group-hover:scale-110 transition-transform"><CalendarDays size={32} /></div>
+                <span className="font-black text-slate-900 dark:text-white text-2xl tracking-tighter uppercase">DAILY HISTORY</span>
+              </div>
+            </button>
 
             <button
               onClick={() => onNavigate(ViewType.DASHBOARD)}
