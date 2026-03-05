@@ -60,22 +60,28 @@ export const useWordPowerEngine = (
         return () => clearRootTimer();
     }, [clearRootTimer]);
 
-    const getTodayRoots = useCallback(() => {
-        const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-        const offset = selectedUser === 'Riyaan' ? 1 : 0;
-        const startIndex = (dayOfYear + offset) % wordPowerRoots.length;
-        const rootRaw = wordPowerRoots[startIndex];
+    const getRandomRoots = useCallback(() => {
+        const randomIndex = Math.floor(Math.random() * wordPowerRoots.length);
+        const rootRaw = wordPowerRoots[randomIndex];
         const limitedQuestions = rootRaw.questions.slice(0, 3);
         return [{ ...rootRaw, questions: limitedQuestions }];
-    }, [selectedUser]);
+    }, []);
 
     const prepareQuestion = useCallback((q: WordPowerQuestion): WordPowerQuestion => {
+        // Create an array mapping text to whether it was originally the correct answer
         const optionObjects = q.options.map((opt, i) => ({ text: opt, isCorrect: i === q.correct }));
+
+        // Robust Fisher-Yates shuffle
         for (let i = optionObjects.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [optionObjects[i], optionObjects[j]] = [optionObjects[j], optionObjects[i]];
+            const temp = optionObjects[i];
+            optionObjects[i] = optionObjects[j];
+            optionObjects[j] = temp;
         }
+
+        // Find the new index of the correct answer
         const newCorrectIndex = optionObjects.findIndex(o => o.isCorrect);
+
         return {
             ...q,
             options: optionObjects.map(o => o.text),
@@ -193,7 +199,7 @@ export const useWordPowerEngine = (
         rootsRef.current = 0;
         detailsRef.current = [];
 
-        const roots = getTodayRoots();
+        const roots = getRandomRoots();
         todayRootsRef.current = roots;
         rootIndexRef.current = 0;
 
@@ -202,7 +208,7 @@ export const useWordPowerEngine = (
         setIsActive(true);
 
         advanceToNextRoot(roots, 0);
-    }, [getTodayRoots, advanceToNextRoot]);
+    }, [getRandomRoots, advanceToNextRoot]);
 
     // Main game timer 
     useEffect(() => {

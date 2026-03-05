@@ -41,8 +41,20 @@ export const WordPowerView: React.FC<Props> = ({ onBack }) => {
         let aT = 0, rT = 0;
         const h: GameSession[] = data.map((log: any) => {
             const pName = log.player_id === PLAYER_IDS.Ayaan ? 'Ayaan' : 'Riyaan';
-            if (pName === 'Ayaan') aT += log.earnings; else rT += log.earnings;
-            return { id: log.id, player: pName, score: log.score, rootsAttempted: log.details?.rootsAttempted || 0, earnings: log.earnings, timestamp: new Date(log.played_at).getTime(), details: log.details?.details || [] };
+            // Some older logs might not have `earnings` at the top level, fallback to details or calculate
+            const parsedEarnings = log.earnings ?? (log.details?.earnings ?? (log.score * settings.wordpowerMultiplier));
+
+            if (pName === 'Ayaan') aT += parsedEarnings; else rT += parsedEarnings;
+
+            return {
+                id: log.id,
+                player: pName,
+                score: log.score,
+                rootsAttempted: log.details?.rootsAttempted || 0,
+                earnings: parsedEarnings,
+                timestamp: new Date(log.played_at).getTime(),
+                details: log.details?.details || []
+            };
         });
         setAyaanTotal(aT); setRiyaanTotal(rT); setHistory(h);
     }, []);
@@ -51,7 +63,12 @@ export const WordPowerView: React.FC<Props> = ({ onBack }) => {
 
     const getEffectiveDate = useCallback(() => { if (dateOverride) { const d = new Date(dateOverride); if (isNaN(d.getTime())) return new Date(); if (!dateOverride.includes('T')) { const now = new Date(); const [y, m, day] = dateOverride.split('-').map(Number); const ld = new Date(); ld.setFullYear(y, m - 1, day); ld.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds()); return ld; } return d; } return new Date(); }, [dateOverride]);
     const isMarketOpenDay = useCallback(() => { const d = getEffectiveDate(); return !(d.getDay() === 0 || d.getDay() === 6) && !isMarketHoliday(getISTDateKey(d)); }, [getEffectiveDate]);
-    const hasPlayedToday = useCallback((p: string | null) => { if (!p) return false; const t = getISTDateKey(getEffectiveDate()); return history.some(s => s.player === p && getISTDateKey(s.timestamp) === t); }, [history, getEffectiveDate]);
+    const hasPlayedToday = useCallback((p: string | null) => {
+        if (!p) return false;
+        const t = getISTDateKey(getEffectiveDate());
+        if (history.some(s => s.player === p && getISTDateKey(s.timestamp) === t)) return true;
+        return localStorage.getItem(`wordpower_attempt_${p}_${t}`) === 'started';
+    }, [history, getEffectiveDate]);
 
     const finishGame = useCallback(async (result: WordPowerResult) => {
         if (isSubmittingRef.current) return; isSubmittingRef.current = true;
@@ -61,10 +78,34 @@ export const WordPowerView: React.FC<Props> = ({ onBack }) => {
             const up = getUserProfile(selectedUser);
             const pid = up ? up.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
             const playedAt = new Date(getEffectiveDate().getTime());
-            await supabase.from('wordpower_logs').insert({ player_id: pid, score: result.totalScore, wrong_count: result.totalWrong, unanswered_count: result.totalUnanswered, earnings, details: result, played_at: playedAt.toISOString() });
+
+            // Note: removed unanswered_count from top level as it might not be in the schema, it's inside details jsonb
+            const { error } = await supabase.from('wordpower_logs').insert({
+                player_id: pid,
+                score: result.totalScore,
+                wrong_count: result.totalWrong,
+                earnings,
+                details: result,
+                played_at: playedAt.toISOString()
+            });
+
+            if (error) {
+                console.error("Error saving word power game:", error);
+                alert("Failed to save game data to the server. Please check your connection.");
+            } else {
+                // Clear localStorage crash-protection flag on successful save
+                // so "played today" is now driven purely by the DB
+                const todayIST = getISTDateKey(playedAt);
+                localStorage.removeItem(`wordpower_attempt_${selectedUser}_${todayIST}`);
+            }
+
             setHistory(prev => [{
-                id: crypto.randomUUID(), player: selectedUser, score: result.totalScore, rootsAttempted: result.rootsAttempted || 0, earnings, timestamp: playedAt.getTime(), details: []
+                id: crypto.randomUUID(), player: selectedUser, score: result.totalScore, rootsAttempted: result.rootsAttempted || 0, earnings, timestamp: playedAt.getTime(), details: result.details
             }, ...prev]);
+
+            // 🚀 Instant update for dashboard totals (circle avatars)
+            if (selectedUser === 'Ayaan') setAyaanTotal(prev => prev + earnings);
+            else if (selectedUser === 'Riyaan') setRiyaanTotal(prev => prev + earnings);
         }
         setSubView(SubView.RESULTS); isSubmittingRef.current = false;
     }, [selectedUser, getEffectiveDate, getUserProfile]);
@@ -74,6 +115,12 @@ export const WordPowerView: React.FC<Props> = ({ onBack }) => {
     const startGame = () => {
         if (!isMarketOpenDay()) return alert("Market closed!");
         if (hasPlayedToday(selectedUser)) return alert("Already played today!");
+
+        if (selectedUser) {
+            const todayIST = getISTDateKey(getEffectiveDate());
+            localStorage.setItem(`wordpower_attempt_${selectedUser}_${todayIST}`, 'started');
+        }
+
         triggerStart(); setSubView(SubView.GAME);
     };
 
@@ -82,8 +129,28 @@ export const WordPowerView: React.FC<Props> = ({ onBack }) => {
     const handleVerifyPin = async (pin: string) => { const p = getUserProfile(selectedUser); if (!p) return false; if (pin === p.pin) { await supabase.from('profiles').update({ pin_attempts: 0 }).eq('id', p.id); return true; } const next = (p.pin_attempts || 0) + 1; const u: any = { pin_attempts: next }; if (next >= 3) u.is_locked = true; await supabase.from('profiles').update(u).eq('id', p.id); return false; };
 
     const groupedHistory = useMemo(() => {
-        const g: Record<string, DailyRecord> = {};
-        history.forEach(s => { const dk = getISTDateKey(s.timestamp); if (!g[dk]) g[dk] = { dateKey: dk, displayDate: new Date(s.timestamp).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric' }), timestamp: s.timestamp, ayaanEarnings: null, riyaanEarnings: null }; if (s.player === 'Ayaan') g[dk].ayaanEarnings = (g[dk].ayaanEarnings || 0) + s.earnings; else g[dk].riyaanEarnings = (g[dk].riyaanEarnings || 0) + s.earnings; });
+        const g: Record<string, DailyRecord & { ayaanTime: string | null; riyaanTime: string | null }> = {};
+        history.forEach(s => {
+            const dk = getISTDateKey(s.timestamp);
+            if (!g[dk]) {
+                g[dk] = {
+                    dateKey: dk,
+                    displayDate: new Date(s.timestamp).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric' }),
+                    timestamp: s.timestamp,
+                    ayaanEarnings: null,
+                    riyaanEarnings: null,
+                    ayaanTime: null,
+                    riyaanTime: null
+                };
+            }
+            if (s.player === 'Ayaan') {
+                g[dk].ayaanEarnings = (g[dk].ayaanEarnings || 0) + s.earnings;
+                g[dk].ayaanTime = new Date(s.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+            } else {
+                g[dk].riyaanEarnings = (g[dk].riyaanEarnings || 0) + s.earnings;
+                g[dk].riyaanTime = new Date(s.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+            }
+        });
         return Object.values(g).sort((a, b) => b.timestamp - a.timestamp);
     }, [history]);
 
