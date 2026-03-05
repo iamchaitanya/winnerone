@@ -131,6 +131,7 @@ export function useMathMasteryEngine(onFinish: (score: number, wrong: number, re
     const resultsRef = useRef<MathMasteryResult[]>([]);
     const onFinishRef = useRef(onFinish);
     const hasFinishedRef = useRef(false);
+    const isProcessingRef = useRef(false);
 
     // Keep the onFinish ref up to date
     useEffect(() => { onFinishRef.current = onFinish; }, [onFinish]);
@@ -140,6 +141,7 @@ export function useMathMasteryEngine(onFinish: (score: number, wrong: number, re
         wrongRef.current = 0;
         resultsRef.current = [];
         hasFinishedRef.current = false;
+        isProcessingRef.current = false;
         setIsPlaying(true);
         setTimeLeft(100);
         setScore(0);
@@ -186,51 +188,62 @@ export function useMathMasteryEngine(onFinish: (score: number, wrong: number, re
         } else if (key === 'clear') {
             setUserInput('');
         } else if (key === 'skip') {
+            if (isProcessingRef.current) return;
+            isProcessingRef.current = true;
+
             // Skips do not count as wrong
             setCurrentQuestion(generateQuestion());
             setUserInput('');
             questionStartTimeRef.current = Date.now();
+
+            // Short delay to release lock, allowing UI to catch up
+            setTimeout(() => { isProcessingRef.current = false; }, 100);
         } else if (key === 'enter') {
-            setUserInput(prevInput => {
-                if (prevInput === '') return prevInput;
+            if (isProcessingRef.current || userInput === '') return;
+            isProcessingRef.current = true;
 
-                setCurrentQuestion(prevQ => {
-                    if (!prevQ) return prevQ;
+            setCurrentQuestion(prevQ => {
+                if (!prevQ) {
+                    isProcessingRef.current = false;
+                    return prevQ;
+                }
 
-                    const timeTaken = (Date.now() - questionStartTimeRef.current) / 1000;
+                const timeTaken = (Date.now() - questionStartTimeRef.current) / 1000;
 
-                    // Flexible matching for decimals (e.g., 12.5 == 12.50)
-                    let isCorrect = false;
-                    if (prevQ.answer.includes('.')) {
-                        isCorrect = parseFloat(prevInput) === parseFloat(prevQ.answer);
-                    } else {
-                        isCorrect = prevInput === prevQ.answer;
-                    }
+                // Flexible matching for decimals (e.g., 12.5 == 12.50)
+                let isCorrect = false;
+                if (prevQ.answer.includes('.')) {
+                    isCorrect = parseFloat(userInput) === parseFloat(prevQ.answer);
+                } else {
+                    isCorrect = userInput === prevQ.answer;
+                }
 
-                    const res: MathMasteryResult = {
-                        question: prevQ.question,
-                        answer: prevQ.answer,
-                        userAnswer: prevInput,
-                        isCorrect,
-                        timeTaken,
-                        category: prevQ.category
-                    };
+                const res: MathMasteryResult = {
+                    question: prevQ.question,
+                    answer: prevQ.answer,
+                    userAnswer: userInput,
+                    isCorrect,
+                    timeTaken,
+                    category: prevQ.category
+                };
 
-                    // Update refs (source of truth for timer callback)
-                    resultsRef.current = [...resultsRef.current, res];
-                    if (isCorrect) scoreRef.current++;
-                    else wrongRef.current++;
+                // Update refs (source of truth for timer callback)
+                resultsRef.current = [...resultsRef.current, res];
+                if (isCorrect) scoreRef.current++;
+                else wrongRef.current++;
 
-                    // Update state (for UI)
-                    setResults(prev => [...prev, res]);
-                    if (isCorrect) setScore(s => s + 1);
-                    else setWrong(w => w + 1);
+                // Update state (for UI)
+                setResults(prev => [...prev, res]);
+                if (isCorrect) setScore(s => s + 1);
+                else setWrong(w => w + 1);
 
-                    questionStartTimeRef.current = Date.now();
-                    return generateQuestion();
-                });
+                questionStartTimeRef.current = Date.now();
+                setUserInput(''); // Reset input
 
-                return ''; // Clear input
+                // Release lock after small delay
+                setTimeout(() => { isProcessingRef.current = false; }, 100);
+
+                return generateQuestion();
             });
         } else {
             // Prevent multiple decimals
