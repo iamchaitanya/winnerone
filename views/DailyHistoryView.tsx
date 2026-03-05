@@ -222,11 +222,11 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 p-1 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl">
-                        <button onClick={() => setPlayerFilter('Ayaan')} className={`px-6 py-2 rounded-lg text-sm font-black tracking-wider transition-all duration-300 ${playerFilter === 'Ayaan' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                    <div className="flex items-center gap-2 p-1.5 bg-slate-200/50 dark:bg-slate-800/50 rounded-2xl w-full sm:w-72 mt-4 sm:mt-0">
+                        <button onClick={() => setPlayerFilter('Ayaan')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${playerFilter === 'Ayaan' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                             Ayaan
                         </button>
-                        <button onClick={() => setPlayerFilter('Riyaan')} className={`px-6 py-2 rounded-lg text-sm font-black tracking-wider transition-all duration-300 ${playerFilter === 'Riyaan' ? 'bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                        <button onClick={() => setPlayerFilter('Riyaan')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${playerFilter === 'Riyaan' ? 'bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                             Riyaan
                         </button>
                     </div>
