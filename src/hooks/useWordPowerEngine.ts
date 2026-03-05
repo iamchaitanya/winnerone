@@ -4,6 +4,7 @@ import { wordPowerRoots, WordPowerRoot, WordPowerQuestion } from '../lib/wordPow
 export interface WordPowerResult {
     totalCorrect: number;
     totalWrong: number;
+    totalUnanswered: number;
     totalScore: number;
     rootsAttempted: number;
     details: { root: string; meaning: string; question: string; userAnswer: number; correct: number; isCorrect: boolean }[];
@@ -30,6 +31,7 @@ export const useWordPowerEngine = (
     const detailsRef = useRef<WordPowerResult['details']>([]);
     const correctRef = useRef(0);
     const wrongRef = useRef(0);
+    const unansweredRef = useRef(0);
     const rootsRef = useRef(0);
     const rootIndexRef = useRef(0);
     const currentQuestionIndexRef = useRef(0);
@@ -87,11 +89,35 @@ export const useWordPowerEngine = (
         setIsActive(false);
         clearRootTimer();
 
+        // If game ends while on a question that hasn't been resolved yet, count it as unanswered
+        if (phaseRef.current === 'question' && detailsRef.current.length < rootsRef.current * 3) {
+            const currentQIndex = currentQuestionIndexRef.current;
+            const cRoot = currentRootRef.current;
+            const cQuestion = currentQuestionRef.current;
+
+            // Check if this specific question has already been recorded in details
+            const alreadyRecorded = detailsRef.current.some(d => d.root === cRoot?.root && d.question === cQuestion?.word);
+
+            if (!alreadyRecorded && cRoot && cQuestion) {
+                unansweredRef.current++;
+                detailsRef.current.push({
+                    root: cRoot.root,
+                    meaning: cRoot.meaning,
+                    question: cQuestion.word,
+                    userAnswer: -1,
+                    correct: cQuestion.correct,
+                    isCorrect: false,
+                    scoreChange: 0
+                } as any);
+            }
+        }
+
         const finalCalculatedScore = detailsRef.current.reduce((acc, d: any) => acc + (d.scoreChange || 0), 0);
 
         onFinishRef.current({
             totalCorrect: correctRef.current,
             totalWrong: wrongRef.current,
+            totalUnanswered: unansweredRef.current,
             totalScore: finalCalculatedScore,
             rootsAttempted: rootsRef.current,
             details: detailsRef.current
@@ -163,6 +189,7 @@ export const useWordPowerEngine = (
         hasFinishedRef.current = false;
         correctRef.current = 0;
         wrongRef.current = 0;
+        unansweredRef.current = 0;
         rootsRef.current = 0;
         detailsRef.current = [];
 
@@ -210,7 +237,7 @@ export const useWordPowerEngine = (
         if (isTimeout || optionIndex === -1) {
             // no answer = 0
             scoreChange = 0;
-            wrongRef.current++; // treating timeout as wrong for stats, but 0 point penalty
+            unansweredRef.current++; // Timeout is now explicitly tracked as unanswered
             isCorrect = false;
             optionIndex = -1;
         } else {

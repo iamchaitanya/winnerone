@@ -61,7 +61,7 @@ export const WordPowerView: React.FC<Props> = ({ onBack }) => {
             const up = getUserProfile(selectedUser);
             const pid = up ? up.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
             const playedAt = new Date(getEffectiveDate().getTime());
-            await supabase.from('wordpower_logs').insert({ player_id: pid, score: result.totalScore, wrong_count: result.totalWrong, earnings, details: result, played_at: playedAt.toISOString() });
+            await supabase.from('wordpower_logs').insert({ player_id: pid, score: result.totalScore, wrong_count: result.totalWrong, unanswered_count: result.totalUnanswered, earnings, details: result, played_at: playedAt.toISOString() });
             setHistory(prev => [{
                 id: crypto.randomUUID(), player: selectedUser, score: result.totalScore, rootsAttempted: result.rootsAttempted || 0, earnings, timestamp: playedAt.getTime(), details: []
             }, ...prev]);
@@ -92,7 +92,7 @@ export const WordPowerView: React.FC<Props> = ({ onBack }) => {
         case SubView.PIN: return <AdditionPinEntry selectedUser={selectedUser} onSuccess={() => setSubView(SubView.PRE)} onBack={() => setSubView(SubView.HUB)} />;
         case SubView.PRE: return <WordPowerPreEntry selectedUser={selectedUser} isPlayed={hasPlayedToday(selectedUser)} isMarketWorking={isMarketOpenDay()} onStart={startGame} onBack={() => setSubView(SubView.HUB)} />;
         case SubView.GAME: return <WordPowerGame phase={phase} currentRoot={currentRoot} currentQuestion={currentQuestion} currentQuestionIndex={currentQuestionIndex} timeLeft={timeLeft} rootTimeLeft={rootTimeLeft} answered={answered} onAnswer={handleAnswer} />;
-        case SubView.RESULTS: return finalResult ? <WordPowerResults totalCorrect={finalResult.totalCorrect} totalWrong={finalResult.totalWrong} totalScore={finalResult.totalScore} rootsAttempted={finalResult.rootsAttempted} finalEarnings={finalEarnings} onExit={() => setSubView(SubView.HUB)} /> : null;
+        case SubView.RESULTS: return finalResult ? <WordPowerResults totalCorrect={finalResult.totalCorrect} totalWrong={finalResult.totalWrong} totalUnanswered={finalResult.totalUnanswered} totalScore={finalResult.totalScore} rootsAttempted={finalResult.rootsAttempted} finalEarnings={finalEarnings} onExit={() => setSubView(SubView.HUB)} /> : null;
         case SubView.DASH: return <WordPowerDashboard ayaanTotal={ayaanTotal} riyaanTotal={riyaanTotal} groupedHistory={groupedHistory} onBack={() => setSubView(SubView.HUB)} />;
         case SubView.HISTORY: return <WordPowerHistory history={history} historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} onBack={() => setSubView(SubView.HUB)} />;
         default: return null;
