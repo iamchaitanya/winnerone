@@ -168,6 +168,7 @@ export const MultiplicationView: React.FC<MultiplicationViewProps> = ({ onBack }
                 const todayIST = getISTDateKey(new Date(effectiveTime));
                 localStorage.removeItem(`multiplication_attempt_${selectedUser}_${todayIST}`);
             }
+            await syncWithCloud();
         }
         setSubView(MulSubView.RESULTS);
         isSubmittingRef.current = false;

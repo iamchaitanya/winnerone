@@ -99,13 +99,7 @@ export const WordPowerView: React.FC<Props> = ({ onBack }) => {
                 localStorage.removeItem(`wordpower_attempt_${selectedUser}_${todayIST}`);
             }
 
-            setHistory(prev => [{
-                id: crypto.randomUUID(), player: selectedUser, score: result.totalScore, rootsAttempted: result.rootsAttempted || 0, earnings, timestamp: playedAt.getTime(), details: result.details
-            }, ...prev]);
-
-            // 🚀 Instant update for dashboard totals (circle avatars)
-            if (selectedUser === 'Ayaan') setAyaanTotal(prev => prev + earnings);
-            else if (selectedUser === 'Riyaan') setRiyaanTotal(prev => prev + earnings);
+            await syncWithCloud();
         }
         setSubView(SubView.RESULTS); isSubmittingRef.current = false;
     }, [selectedUser, getEffectiveDate, getUserProfile]);

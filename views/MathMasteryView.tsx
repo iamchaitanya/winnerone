@@ -171,6 +171,7 @@ export const MathMasteryView: React.FC<MathMasteryViewProps> = ({ onBack }) => {
                 const todayIST = getISTDateKey(new Date(effectiveTime));
                 localStorage.removeItem(`mathmastery_attempt_${selectedUser}_${todayIST}`);
             }
+            await syncWithCloud();
         }
 
         setView('results');

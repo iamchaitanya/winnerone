@@ -215,6 +215,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
         const todayIST = getISTDateKey(new Date(effectiveTime));
         localStorage.removeItem(`addition_attempt_${selectedUser}_${todayIST}`);
       }
+      await syncWithCloud();
     }
 
     setSubView(AdditionSubView.RESULTS);

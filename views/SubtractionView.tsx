@@ -211,6 +211,7 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
                 const todayIST = getISTDateKey(new Date(effectiveTime));
                 localStorage.removeItem(`subtraction_attempt_${selectedUser}_${todayIST}`);
             }
+            await syncWithCloud();
         }
 
         setSubView(SubtractionSubView.RESULTS);

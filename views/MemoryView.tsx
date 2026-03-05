@@ -98,11 +98,8 @@ export const MemoryView: React.FC<MemoryViewProps> = ({ onBack }) => {
             if (!error) {
                 const todayIST = getISTDateKey(playedAt);
                 localStorage.removeItem(`memory_attempt_${selectedUser}_${todayIST}`);
-                setHistory(prev => [{
-                    id: crypto.randomUUID(), player: selectedUser, score: result.totalScore, levelReached: result.reachedLevel4 ? 4 : 3, earnings, timestamp: playedAt.getTime(),
-                    grid: result.grid, clickedNumbers: result.clickedNumbers, wrongClick: result.wrongClick
-                }, ...prev]);
             }
+            await syncWithCloud();
         }
         setSubView(SubView.RESULTS);
         isSubmittingRef.current = false;

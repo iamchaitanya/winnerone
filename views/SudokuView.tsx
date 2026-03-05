@@ -120,11 +120,8 @@ export const SudokuView: React.FC<SudokuViewProps> = ({ onBack }) => {
             } else {
                 const todayIST = getISTDateKey(playedAt);
                 localStorage.removeItem(`sudoku_attempt_${selectedUser}_${todayIST}`);
-                setHistory(prev => [{
-                    id: crypto.randomUUID(), player: selectedUser, score: result.correct, wrong: result.wrong, earnings, timestamp: playedAt.getTime(),
-                    grid: result.grid, solution: result.solution, clues: result.clues
-                }, ...prev]);
             }
+            await syncWithCloud();
         }
 
         setSubView(SubView.RESULTS);

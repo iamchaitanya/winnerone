@@ -82,9 +82,7 @@ export const Barron800View: React.FC<Props> = ({ onBack }) => {
             const todayIST = getISTDateKey(playedAt);
             localStorage.removeItem(`barron800_attempt_${selectedUser}_${todayIST}`);
 
-            setHistory(prev => [{
-                id: crypto.randomUUID(), player: selectedUser, score: result.score, wrongCount: result.wrongCount, earnings, timestamp: playedAt.getTime()
-            }, ...prev]);
+            await syncWithCloud();
         }
         setSubView(SubView.RESULTS); isSubmittingRef.current = false;
     }, [selectedUser, getEffectiveDate, getUserProfile]);

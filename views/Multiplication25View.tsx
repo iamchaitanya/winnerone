@@ -127,6 +127,7 @@ export const Multiplication25View: React.FC<Multiplication25ViewProps> = ({ onBa
                 const todayIST = getISTDateKey(new Date(effectiveTime));
                 localStorage.removeItem(`multiplication25_attempt_${selectedUser}_${todayIST}`);
             }
+            await syncWithCloud();
         }
         setSubView(Mul25SubView.RESULTS);
         isSubmittingRef.current = false;

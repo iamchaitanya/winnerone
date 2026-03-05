@@ -82,10 +82,7 @@ export const Manhattan500View: React.FC<Props> = ({ onBack }) => {
             const todayIST = getISTDateKey(playedAt);
             localStorage.removeItem(`manhattan500_attempt_${selectedUser}_${todayIST}`);
 
-            // Optimistically update local history so "hasPlayedToday" works immediately before realtime sync catches up
-            setHistory(prev => [{
-                id: crypto.randomUUID(), player: selectedUser, score: result.score, wrongCount: result.wrongCount, earnings, timestamp: playedAt.getTime()
-            }, ...prev]);
+            await syncWithCloud();
         }
         setSubView(SubView.RESULTS); isSubmittingRef.current = false;
     }, [selectedUser, getEffectiveDate, getUserProfile]);
