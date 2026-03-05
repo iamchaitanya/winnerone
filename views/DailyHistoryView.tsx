@@ -44,6 +44,7 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
     const [selectedDate, setSelectedDate] = useState<string>(getISTDateKey(new Date()));
     const [playerFilter, setPlayerFilter] = useState<PlayerFilter>('Ayaan');
     const [expandedGames, setExpandedGames] = useState<Set<string>>(new Set());
+    const [showSudokuSolutions, setShowSudokuSolutions] = useState<Record<string, boolean>>({});
 
     const fetchAllData = useCallback(async () => {
         setLoading(true);
@@ -68,7 +69,7 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                             score: gt.scoreField ? (row[gt.scoreField] || 0) : 0,
                             timestamp: timestamp,
                             displayTime: new Date(timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }),
-                            details: row.details || row
+                            details: row
                         });
                     }
                 }
@@ -141,19 +142,77 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
         setSelectedDate(getISTDateKey(d));
     };
 
-    const renderGameDetails = (gameName: string, details: any) => {
-        if (!details) return <div className="text-xs text-slate-400 italic py-2">No detailed log available</div>;
+    const renderGameDetails = (gameName: string, row: any) => {
+        if (!row) return <div className="text-xs text-slate-400 italic py-2 px-4 bg-slate-50/50 dark:bg-slate-800/20 rounded-xl">No detailed log available</div>;
+
+        // Robust data parsing
+        const getDetails = (r: any) => {
+            if (!r || !r.details) return {};
+            if (typeof r.details === 'string') {
+                try { return JSON.parse(r.details); } catch (e) { return {}; }
+            }
+            return r.details;
+        };
+
+        const details = getDetails(row);
 
         switch (gameName) {
+            case 'Mental Math':
+                if (!details || !details.steps) {
+                    return <div className="text-xs text-slate-400 italic py-2 px-4 bg-slate-50/50 dark:bg-slate-800/20 rounded-xl">No detailed log available</div>;
+                }
+
+                const mmIsCorrect = row.wrong_count === 0;
+                return (
+                    <div className="bg-slate-50/50 dark:bg-slate-800/20 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-sm flex-shrink-0 ${mmIsCorrect ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                                {mmIsCorrect ? '✓' : '✗'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="font-black text-slate-900 dark:text-white text-sm">
+                                    {row.score} steps → {details.userAnswer ?? '—'} {mmIsCorrect ? '= ' : '≠ '}{details.correctAnswer}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            {(details.steps || []).map((step: any, si: number) => (
+                                <div key={si} className="flex items-center gap-3 px-3 py-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
+                                    <div className="w-7 h-7 bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 rounded-lg flex items-center justify-center font-black text-[10px]">
+                                        {step.stepNumber}
+                                    </div>
+                                    <span className="font-black text-sm text-slate-900 dark:text-white tabular-nums flex-1">
+                                        {step.operator ? `${step.operator === '-' ? '−' : step.operator} ${step.operand}` : step.operand}
+                                    </span>
+                                    <span className="font-black text-sm text-cyan-500 tabular-nums">= {step.runningTotal}</span>
+                                </div>
+                            ))}
+                            <div className="mt-3 flex justify-between items-center px-4 py-3 bg-white dark:bg-slate-900 rounded-xl border-2 border-slate-200 dark:border-slate-700 shadow-sm">
+                                <div>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Your Answer</p>
+                                    <p className={`text-lg font-black tabular-nums ${mmIsCorrect ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                        {details.userAnswer ?? '—'}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Correct</p>
+                                    <p className="text-lg font-black text-emerald-500 tabular-nums">{details.correctAnswer}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+
             case 'Addition':
             case 'Subtraction':
             case 'Multiplication':
             case 'Multiply':
             case 'Multiplication 25':
             case 'Divide':
-            case 'Mental Math':
             case 'Math Mastery':
-                const mathResults = Array.isArray(details) ? details : [];
+                // For these math games, details is an array of questions
+                const mathResults = Array.isArray(details) ? details : (details.questions || []);
                 if (mathResults.length === 0) return <div className="text-xs text-slate-400 italic py-2">No detailed log available</div>;
 
                 return (
@@ -162,29 +221,25 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                             <thead>
                                 <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
                                     <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Ques</th>
-                                    <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center leading-none">Ans</th>
-                                    <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center leading-none">Corr</th>
-                                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right leading-none">Time</th>
+                                    <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Ans</th>
+                                    <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Corr</th>
+                                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Time</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                                 {mathResults.map((res: any, i: number) => {
-                                    // Handle missing time property gracefully, it might not exist on all past logs
                                     let timeStr = '-';
                                     if (res.timeTaken !== undefined && res.timeTaken !== null) {
                                         const t = Number(res.timeTaken);
-                                        // If t > 500, we probably saved it as ms. Otherwise assume seconds.
                                         timeStr = t > 500 ? `${(t / 1000).toFixed(1)}s` : `${t.toFixed(1)}s`;
                                     }
 
-                                    // Parse expression for mental math vs generic num1/num2 operations vs Multiplication operand1/operand2
                                     let expression = res.expression || res.equation || res.question;
                                     if (!expression) {
                                         let operator = '+';
                                         if (gameName === 'Subtraction') operator = '-';
                                         if (gameName === 'Multiplication' || gameName === 'Multiply' || gameName === 'Multiplication 25' || res.type === 'multiply') operator = '×';
                                         if (gameName === 'Divide' || res.type === 'divide') operator = '÷';
-
                                         const op1 = res.operand1 !== undefined ? res.operand1 : res.num1;
                                         const op2 = res.operand2 !== undefined ? res.operand2 : res.num2;
                                         expression = `${op1} ${operator} ${op2}`;
@@ -202,10 +257,10 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                                                 <span className={`text-sm font-bold tabular-nums ${res.isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>{userAnswerStr}</span>
                                             </td>
                                             <td className="px-3 py-3 text-center">
-                                                <span className={`text-sm font-bold tabular-nums text-slate-900 dark:text-white`}>{correctAnswerStr}</span>
+                                                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{correctAnswerStr}</span>
                                             </td>
                                             <td className="px-4 py-3 text-right">
-                                                <span className="text-xs font-bold text-slate-400 tabular-nums uppercase">{timeStr}</span>
+                                                <span className="text-xs text-slate-400 tabular-nums font-bold uppercase">{timeStr}</span>
                                             </td>
                                         </tr>
                                     );
@@ -218,34 +273,32 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
             case 'Word Power':
             case 'Barron 800':
             case 'Manhattan 500':
-                const vocabArray = details.details ? details.details : (Array.isArray(details) ? details : []);
+                const vocabArray = details.details || details.questions || (Array.isArray(details) ? details : []);
                 if (vocabArray.length === 0) return <div className="text-xs text-slate-400 italic py-2">No detailed log available</div>;
 
                 return (
                     <div className="space-y-3">
-                        {vocabArray.map((d: any, dIdx: number) => {
-                            const wordDisplay = d.root || d.word || d.question || 'Word';
-                            const meaningDisplay = d.meaning ? `(${d.meaning})` : '';
-                            const expectedAnswer = d.options && d.correct !== undefined ? d.options[d.correct] : (d.expectedAnswer || d.correctAnswer || d.answer || '');
-
+                        {vocabArray.map((vItem: any, i: number) => {
+                            const isCorrect = vItem.isCorrect;
                             return (
-                                <div key={dIdx} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                                    <div className={`mt-0.5 p-1 rounded-full shrink-0 ${d.isCorrect !== false ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-500' : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-500'}`}>
-                                        {d.isCorrect !== false ? <Check size={12} strokeWidth={3} /> : <X size={12} strokeWidth={3} />}
+                                <div key={i} className="flex items-start gap-4 p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-800 transition-all hover:shadow-sm">
+                                    <div className={`mt-0.5 p-1 rounded-full flex-shrink-0 ${isCorrect ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-500' : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-500'}`}>
+                                        {isCorrect ? <Check size={14} strokeWidth={3} /> : <X size={14} strokeWidth={3} />}
                                     </div>
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">{wordDisplay} {meaningDisplay && <span className="text-slate-400 opacity-70">{meaningDisplay}</span>}</p>
-                                            {(d.scoreChange !== undefined && d.scoreChange !== null) && (
-                                                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${d.scoreChange > 0 ? 'bg-emerald-100/50 text-emerald-600' : d.scoreChange < 0 ? 'bg-rose-100/50 text-rose-600' : 'bg-slate-200 text-slate-500'}`}>
-                                                    {d.scoreChange > 0 ? '+' : ''}{d.scoreChange}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                            <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest truncate">
+                                                {vItem.root || 'WORD'} <span className="text-slate-400 lowercase italic opacity-80">({vItem.meaning || 'N/A'})</span>
+                                            </p>
+                                            {vItem.scoreChange !== undefined && (
+                                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded tabular-nums ${vItem.scoreChange > 0 ? 'bg-emerald-100/50 text-emerald-600' : vItem.scoreChange < 0 ? 'bg-rose-100/50 text-rose-600' : 'bg-slate-200 text-slate-500'}`}>
+                                                    {vItem.scoreChange > 0 ? '+' : ''}{vItem.scoreChange}
                                                 </span>
                                             )}
                                         </div>
-                                        {d.question && <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mt-1">{d.question}</p>}
-                                        {(d.isCorrect === false && expectedAnswer) && (
-                                            <p className="text-xs font-bold text-slate-500 mt-2">Expected answer: <span className="text-emerald-600 dark:text-emerald-400">{expectedAnswer}</span></p>
-                                        )}
+                                        <p className="text-sm font-black text-slate-700 dark:text-slate-200 leading-tight">
+                                            {vItem.question || vItem.word}
+                                        </p>
                                     </div>
                                 </div>
                             );
@@ -254,34 +307,26 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                 );
 
             case 'Sensex':
-                const sData = details || {};
-                const sIsWin = sData.is_settled && ((sData.prediction === 'UP' && sData.actual_return >= 0) || (sData.prediction === 'DOWN' && sData.actual_return < 0));
                 return (
                     <div className="overflow-x-auto pb-4">
                         <table className="w-full text-left table-auto">
                             <thead>
                                 <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
                                     <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Prediction</th>
-                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Sensex</th>
+                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Return</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                                     <td className="px-4 py-4 text-center border-r border-slate-50 dark:border-slate-800/50">
-                                        <div className="flex flex-col items-center leading-tight">
-                                            <span className={`text-sm font-black ${sData.prediction === 'UP' ? 'text-emerald-500' : 'text-rose-500'}`}>{sData.prediction || '—'}</span>
-                                            {sData.is_settled ? (
-                                                <span className={`text-xs font-black mt-1 ${sIsWin ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                                    {sData.earnings > 0 ? '+' : ''}{Number(sData.earnings || 0).toFixed(1)}
-                                                </span>
-                                            ) : <span className="text-[10px] font-bold text-amber-500 uppercase mt-1">Pending</span>}
+                                        <div className={`text-sm font-black uppercase tracking-tight ${row.prediction === 'up' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                            Sensex {row.prediction}
                                         </div>
                                     </td>
                                     <td className="px-4 py-4 text-center">
-                                        {sData.is_settled ? (
-                                            <div className="flex flex-col items-center leading-tight">
-                                                <span className="text-sm font-black dark:text-white">{sData.closing_value?.toLocaleString('en-IN') || '—'}</span>
-                                                <span className={`text-xs font-bold mt-1 ${sData.actual_return >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{sData.actual_return?.toFixed(2)}%</span>
+                                        {row.actual_return !== null && row.actual_return !== undefined ? (
+                                            <div className={`text-sm font-black tabular-nums ${row.actual_return >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                {row.actual_return >= 0 ? '+' : ''}{Number(row.actual_return).toFixed(2)}%
                                             </div>
                                         ) : <span className="text-[10px] font-bold text-slate-400 uppercase">Market Open</span>}
                                     </td>
@@ -292,8 +337,6 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                 );
 
             case 'Nifty 50':
-                const nData = details || {};
-                const nIsSettled = nData.stock_return !== null && nData.stock_return !== undefined;
                 return (
                     <div className="overflow-x-auto pb-4">
                         <table className="w-full text-left table-auto">
@@ -306,12 +349,12 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                             <tbody>
                                 <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                                     <td className="px-4 py-4 text-center border-r border-slate-50 dark:border-slate-800/50">
-                                        <span className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">{nData.stock_symbol || '—'}</span>
+                                        <span className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">{row.stock_symbol || '—'}</span>
                                     </td>
                                     <td className="px-4 py-4 text-center">
-                                        {nIsSettled ? (
-                                            <div className={`text-sm font-black tabular-nums ${nData.stock_return >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                                {nData.stock_return >= 0 ? '+' : ''}{Number(nData.stock_return).toFixed(2)}%
+                                        {row.stock_return !== null && row.stock_return !== undefined ? (
+                                            <div className={`text-sm font-black tabular-nums ${row.stock_return >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                {row.stock_return >= 0 ? '+' : ''}{Number(row.stock_return).toFixed(2)}%
                                             </div>
                                         ) : (
                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Pending</span>
@@ -324,58 +367,158 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                 );
 
             case 'Sudoku':
-                const sudokuData = details || {};
-                const sScore = sudokuData.score || 0;
-                const sWrong = sudokuData.wrong !== undefined ? sudokuData.wrong : 0;
-
+                const isSudokuSolutionVisible = showSudokuSolutions[row.id] || false;
+                const hasSudokuGrid = details.grid && details.solution && details.clues;
                 return (
-                    <div className="overflow-x-auto pb-4">
-                        <table className="w-full text-left table-auto">
-                            <thead>
-                                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Correct</th>
-                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Mistakes</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                                    <td className="px-4 py-4 text-center border-r border-slate-50 dark:border-slate-800/50">
-                                        <span className="text-sm font-black text-emerald-500 tabular-nums">{sScore}</span>
-                                    </td>
-                                    <td className="px-4 py-4 text-center">
-                                        <span className={`text-sm font-black tabular-nums ${sWrong > 0 ? 'text-rose-500' : 'text-slate-400'}`}>{sWrong}</span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div className="flex flex-col items-center gap-6 py-4 bg-slate-50/50 dark:bg-slate-800/20 rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <div className="flex justify-center gap-12 w-full px-6">
+                            <div className="text-center">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Score</p>
+                                <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">{row.score}</p>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Wrong</p>
+                                <p className="text-2xl font-black text-rose-500 tabular-nums">{row.wrong_count || 0}</p>
+                            </div>
+                        </div>
+
+                        {hasSudokuGrid ? (
+                            <div className="flex flex-col items-center gap-4">
+                                <div className={`flex flex-col items-center gap-6 ${isSudokuSolutionVisible ? 'lg:flex-row lg:items-start lg:justify-center' : ''}`}>
+                                    {/* User Grid */}
+                                    <div className="flex flex-col items-center gap-2">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Your Answer</p>
+                                        <div className="p-2 bg-white dark:bg-slate-950 rounded-xl shadow-inner border border-slate-200 dark:border-slate-800">
+                                            <div className="grid grid-cols-6 gap-0 border-2 border-slate-700 dark:border-slate-400 rounded-lg overflow-hidden">
+                                                {details.grid.map((sRow: number[], r: number) =>
+                                                    sRow.map((cell: number, c: number) => {
+                                                        const isClue = details.clues[r]?.[c];
+                                                        const isCorrect = cell !== 0 && cell === details.solution[r][c];
+                                                        const isEmpty = cell === 0;
+                                                        const borderRight = c === 2 ? 'border-r-2 border-r-slate-700 dark:border-r-slate-400' : 'border-r border-r-slate-200 dark:border-r-slate-700';
+                                                        const borderBottom = r === 1 || r === 3 ? 'border-b-2 border-b-slate-700 dark:border-b-slate-400' : 'border-b border-b-slate-200 dark:border-b-slate-700';
+                                                        const lastCol = c === 5 ? '' : borderRight;
+                                                        const lastRow = r === 5 ? '' : borderBottom;
+
+                                                        let bgColor = 'bg-white dark:bg-slate-900';
+                                                        let textColor = 'text-slate-900 dark:text-white';
+
+                                                        if (isClue) {
+                                                            bgColor = 'bg-slate-100 dark:bg-slate-800';
+                                                            textColor = 'text-slate-500 dark:text-slate-400';
+                                                        } else if (isEmpty) {
+                                                            bgColor = 'bg-amber-50 dark:bg-amber-900/20';
+                                                            textColor = 'text-amber-400';
+                                                        } else if (isCorrect) {
+                                                            bgColor = 'bg-emerald-50 dark:bg-emerald-900/20';
+                                                            textColor = 'text-emerald-600 dark:text-emerald-400';
+                                                        } else {
+                                                            bgColor = 'bg-rose-50 dark:bg-rose-900/20';
+                                                            textColor = 'text-rose-600 dark:text-rose-400';
+                                                        }
+
+                                                        return (
+                                                            <div key={`${r}-${c}`} className={`w-8 h-8 flex items-center justify-center text-xs font-black ${lastCol} ${lastRow} ${bgColor} ${textColor}`}>
+                                                                {cell !== 0 ? cell : '·'}
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Solution Grid */}
+                                    {isSudokuSolutionVisible && (
+                                        <div className="flex flex-col items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                            <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Correct Solution</p>
+                                            <div className="p-2 bg-white dark:bg-slate-950 rounded-xl shadow-inner border border-emerald-100 dark:border-emerald-900/30">
+                                                <div className="grid grid-cols-6 gap-0 border-2 border-emerald-500/50 rounded-lg overflow-hidden">
+                                                    {details.solution.map((sRow: number[], r: number) =>
+                                                        sRow.map((cell: number, c: number) => {
+                                                            const isClue = details.clues[r]?.[c];
+                                                            const borderRight = c === 2 ? 'border-r-2 border-r-emerald-500/50' : 'border-r border-slate-200 dark:border-slate-700';
+                                                            const borderBottom = r === 1 || r === 3 ? 'border-b-2 border-b-emerald-500/50' : 'border-b border-slate-200 dark:border-slate-700';
+                                                            const lastCol = c === 5 ? '' : borderRight;
+                                                            const lastRow = r === 5 ? '' : borderBottom;
+
+                                                            return (
+                                                                <div key={`${r}-${c}`} className={`w-8 h-8 flex items-center justify-center text-xs font-black ${lastCol} ${lastRow} ${isClue ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400' : 'bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400'}`}>
+                                                                    {cell}
+                                                                </div>
+                                                            );
+                                                        })
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button
+                                    onClick={() => setShowSudokuSolutions(prev => ({ ...prev, [row.id]: !isSudokuSolutionVisible }))}
+                                    className="flex items-center gap-2 px-4 py-2 font-black text-[10px] uppercase tracking-widest bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 shadow-sm text-slate-500"
+                                >
+                                    <Activity size={12} className={isSudokuSolutionVisible ? 'text-rose-500' : 'text-emerald-500'} />
+                                    {isSudokuSolutionVisible ? 'Hide Solution' : 'Show Solution'}
+                                </button>
+
+                                <div className="flex items-center justify-center gap-4 flex-wrap mt-2">
+                                    <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"></div><span className="text-[9px] font-bold text-slate-400 uppercase">Clue</span></div>
+                                    <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800"></div><span className="text-[9px] font-bold text-slate-400 uppercase">Correct</span></div>
+                                    <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800"></div><span className="text-[9px] font-bold text-slate-400 uppercase">Wrong</span></div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="px-6 py-4 bg-white dark:bg-slate-900 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 text-xs text-slate-400 italic mx-4 text-center leading-relaxed">
+                                Grid data not available for this session
+                            </div>
+                        )}
                     </div>
                 );
 
             case 'Memory':
-                const memData = details || {};
-                const mScore = memData.score || 0;
-                const mLevel = memData.level_reached || 1;
-
+                const hasMemGrid = details.grid && details.clickedNumbers;
+                const memSize = details.levelReached === 4 ? 4 : 3;
                 return (
-                    <div className="overflow-x-auto pb-4">
-                        <table className="w-full text-left table-auto">
-                            <thead>
-                                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Score</th>
-                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Level Reached</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                                    <td className="px-4 py-4 text-center border-r border-slate-50 dark:border-slate-800/50">
-                                        <span className="text-sm font-black text-emerald-500 tabular-nums">{mScore}</span>
-                                    </td>
-                                    <td className="px-4 py-4 text-center">
-                                        <span className="text-sm font-black text-indigo-500 tabular-nums">Lv {mLevel}</span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div className="flex flex-col items-center gap-6 py-4 bg-slate-50/50 dark:bg-slate-800/20 rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <div className="flex justify-center gap-12 w-full px-6">
+                            <div className="text-center">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Score</p>
+                                <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">{row.score}</p>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Level</p>
+                                <p className="text-2xl font-black text-indigo-500 tabular-nums">{memSize === 4 ? '4×4' : '3×3'}</p>
+                            </div>
+                        </div>
+
+                        {hasMemGrid ? (
+                            <div className="w-full max-w-[160px] mx-auto p-3 bg-white dark:bg-slate-950 rounded-2xl shadow-inner border border-slate-200 dark:border-slate-800 px-4 py-4">
+                                <div className={`grid gap-1.5 ${memSize === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                                    {details.grid.slice(0, memSize * memSize).map((val: number, idx: number) => {
+                                        const isCorrect = details.clickedNumbers.includes(val);
+                                        const isWrong = val === details.wrongClick;
+                                        return (
+                                            <div key={idx} className={`aspect-square flex items-center justify-center rounded-lg text-xs font-black shadow-sm transition-transform ${isCorrect ? 'bg-emerald-500 text-white' :
+                                                isWrong ? 'bg-rose-500 text-white animate-pulse' :
+                                                    'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600'
+                                                }`}>
+                                                {val}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="px-6 py-4 bg-white dark:bg-slate-900 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 text-xs text-slate-400 italic mx-4 text-center leading-relaxed">
+                                Grid data not available for this session
+                            </div>
+                        )}
+                        <div className="flex items-center justify-center gap-4 flex-wrap">
+                            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-emerald-500"></div><span className="text-[9px] font-bold text-slate-400 uppercase">Correct</span></div>
+                            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-rose-500"></div><span className="text-[9px] font-bold text-slate-400 uppercase">Wrong</span></div>
+                        </div>
                     </div>
                 );
 
