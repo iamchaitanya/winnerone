@@ -198,11 +198,8 @@ export const MentalMathView: React.FC<MentalMathViewProps> = ({ onBack }) => {
                 console.log('✅ MentalMath log saved successfully');
                 const todayIST = getISTDateKey(playedAtDate);
                 localStorage.removeItem(`mentalmath_attempt_${selectedUser}_${todayIST}`);
-                // Safely update history right away
-                setHistory(prev => [{
-                    id: crypto.randomUUID(), player: selectedUser, score: stepsCompleted, wrong: isCorrect ? 0 : 1, earnings, timestamp: playedAtDate.getTime(), details: result
-                }, ...prev]);
             }
+            await syncWithCloud();
         }
 
         setSubView(MentalMathSubView.RESULTS);
