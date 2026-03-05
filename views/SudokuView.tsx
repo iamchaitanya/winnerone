@@ -19,8 +19,8 @@ interface SudokuViewProps { onBack: () => void; }
 
 enum SubView { HUB = 'hub', PIN_ENTRY = 'pin_entry', PRE_ENTRY = 'pre_entry', GAME = 'game', RESULTS = 'results', LOCAL_DASHBOARD = 'local_dashboard', MASTER_HISTORY = 'master_history' }
 
-interface GameSession { id: string; player: string; score: number; wrong: number; earnings: number; timestamp: number; }
-interface DailyRecord { dateKey: string; displayDate: string; timestamp: number; ayaanEarnings: number | null; riyaanEarnings: number | null; }
+interface GameSession { id: string; player: string; score: number; wrong: number; earnings: number; timestamp: number; grid?: number[][]; solution?: number[][]; clues?: boolean[][]; }
+interface DailyRecord { dateKey: string; displayDate: string; timestamp: number; ayaanEarnings: number | null; ayaanTime: string | null; riyaanEarnings: number | null; riyaanTime: string | null; }
 
 export const SudokuView: React.FC<SudokuViewProps> = ({ onBack }) => {
     const settings = useGameStore(s => s.settings);
@@ -51,7 +51,8 @@ export const SudokuView: React.FC<SudokuViewProps> = ({ onBack }) => {
         const h: GameSession[] = data.map((log: any) => {
             const pName = log.player_id === PLAYER_IDS.Ayaan ? 'Ayaan' : 'Riyaan';
             if (pName === 'Ayaan') aT += log.earnings; else rT += log.earnings;
-            return { id: log.id, player: pName, score: log.score, wrong: log.wrong_count, earnings: log.earnings, timestamp: new Date(log.played_at).getTime() };
+            const details = log.details || {};
+            return { id: log.id, player: pName, score: log.score, wrong: log.wrong_count, earnings: log.earnings, timestamp: new Date(log.played_at).getTime(), grid: details.grid, solution: details.solution, clues: details.clues };
         });
         setAyaanTotal(aT); setRiyaanTotal(rT); setHistory(h);
     }, []);
@@ -109,14 +110,15 @@ export const SudokuView: React.FC<SudokuViewProps> = ({ onBack }) => {
             const playedAt = new Date(getEffectiveDate().getTime());
             const { error: insertError } = await supabase.from('sudoku_logs').insert({
                 player_id: playerId, score: result.correct, wrong_count: result.wrong, earnings,
-                details: { grid: result.grid, solution: result.solution },
+                details: { grid: result.grid, solution: result.solution, clues: result.clues },
                 played_at: playedAt.toISOString()
             });
             if (insertError) {
                 console.error("Supabase insert error for sudoku_logs:", insertError);
             } else {
                 setHistory(prev => [{
-                    id: crypto.randomUUID(), player: selectedUser, score: result.correct, wrong: result.wrong, earnings, timestamp: playedAt.getTime()
+                    id: crypto.randomUUID(), player: selectedUser, score: result.correct, wrong: result.wrong, earnings, timestamp: playedAt.getTime(),
+                    grid: result.grid, solution: result.solution, clues: result.clues
                 }, ...prev]);
             }
         }
@@ -153,9 +155,14 @@ export const SudokuView: React.FC<SudokuViewProps> = ({ onBack }) => {
         const groups: Record<string, DailyRecord> = {};
         history.forEach(s => {
             const dk = getISTDateKey(s.timestamp);
-            if (!groups[dk]) { groups[dk] = { dateKey: dk, displayDate: new Date(s.timestamp).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric' }), timestamp: s.timestamp, ayaanEarnings: null, riyaanEarnings: null }; }
-            if (s.player === 'Ayaan') groups[dk].ayaanEarnings = (groups[dk].ayaanEarnings || 0) + s.earnings;
-            else groups[dk].riyaanEarnings = (groups[dk].riyaanEarnings || 0) + s.earnings;
+            if (!groups[dk]) { groups[dk] = { dateKey: dk, displayDate: new Date(s.timestamp).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric' }), timestamp: s.timestamp, ayaanEarnings: null, ayaanTime: null, riyaanEarnings: null, riyaanTime: null }; }
+            if (s.player === 'Ayaan') {
+                groups[dk].ayaanEarnings = (groups[dk].ayaanEarnings || 0) + s.earnings;
+                groups[dk].ayaanTime = new Date(s.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+            } else {
+                groups[dk].riyaanEarnings = (groups[dk].riyaanEarnings || 0) + s.earnings;
+                groups[dk].riyaanTime = new Date(s.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+            }
         });
         return Object.values(groups).sort((a, b) => b.timestamp - a.timestamp);
     }, [history]);

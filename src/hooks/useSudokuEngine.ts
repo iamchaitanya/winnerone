@@ -82,13 +82,16 @@ export const useSudokuEngine = (
         const currentPuzzle = puzzleRef.current;
         const currentClues = cluesRef.current;
 
+        // Empty cells = 0 marks (skipped), correct = +1, wrong = -1
         for (let r = 0; r < 6; r++) {
             for (let c = 0; c < 6; c++) {
-                if (!currentClues[r][c]) { // Only count non-clue cells
-                    if (currentGrid[r][c] === currentPuzzle.solution[r][c]) {
+                if (!currentClues[r][c]) {
+                    if (currentGrid[r][c] === 0) {
+                        // Empty cell — 0 marks, skip
+                    } else if (currentGrid[r][c] === currentPuzzle.solution[r][c]) {
                         correct++;
                     } else {
-                        wrong++; // includes unfilled (0) cells
+                        wrong++;
                     }
                 }
             }
