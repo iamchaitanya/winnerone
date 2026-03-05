@@ -37,15 +37,17 @@ export const VocabGame: React.FC<VocabGameProps> = ({
 
             <div className="flex-1 flex flex-col items-center justify-center max-w-md mx-auto w-full">
                 <div className="text-center mb-8">
-                    <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 ${currentQuestion.questionType === 'synonym'
-                            ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
-                            : 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400'
+                    <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 ${currentQuestion.questionType === 'antonym'
+                            ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400'
+                            : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
                         }`}>
-                        {currentQuestion.questionType === 'synonym' ? 'Synonym' : 'Antonym'}
+                        {currentQuestion.questionType === 'synonym' ? 'Synonym' :
+                            currentQuestion.questionType === 'meaning' ? 'Meaning' : 'Antonym'}
                     </span>
                     <h3 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">{currentQuestion.word}</h3>
                     <p className="text-sm text-slate-400 font-bold mt-2">
-                        Pick the {currentQuestion.questionType === 'synonym' ? 'synonym' : 'antonym'}
+                        Pick the {currentQuestion.questionType === 'synonym' ? 'synonym' :
+                            currentQuestion.questionType === 'meaning' ? 'correct meaning' : 'antonym'}
                     </p>
                 </div>
 
@@ -61,12 +63,12 @@ export const VocabGame: React.FC<VocabGameProps> = ({
                                 onClick={() => onAnswer(idx)}
                                 disabled={isAnswered}
                                 className={`w-full p-4 rounded-2xl text-left font-bold text-sm transition-all border-2 ${isAnswered
-                                        ? isCorrect
-                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-400 text-emerald-700 dark:text-emerald-300'
-                                            : isSelected
-                                                ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-400 text-rose-700 dark:text-rose-300'
-                                                : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-400'
-                                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-400 active:scale-[0.98]'
+                                    ? isCorrect
+                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-400 text-emerald-700 dark:text-emerald-300'
+                                        : isSelected
+                                            ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-400 text-rose-700 dark:text-rose-300'
+                                            : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-400'
+                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-400 active:scale-[0.98]'
                                     }`}
                             >
                                 <div className="flex items-center gap-3">

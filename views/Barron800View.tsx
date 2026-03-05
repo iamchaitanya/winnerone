@@ -16,16 +16,15 @@ import { VocabHistory } from '../src/components/shared/VocabHistory';
 
 interface Props { onBack: () => void; }
 enum SubView { HUB = 'hub', PIN = 'pin', PRE = 'pre', GAME = 'game', RESULTS = 'results', DASH = 'dash', HISTORY = 'history' }
-interface GameSession { id: string; player: string; score: number; wrongCount: number; earnings: number; timestamp: number; }
-interface DailyRecord { dateKey: string; displayDate: string; timestamp: number; ayaanEarnings: number | null; riyaanEarnings: number | null; }
+interface GameSession { id: string; player: string; score: number; wrongCount: number; earnings: number; timestamp: number; details?: any; }
+interface DailyRecord { dateKey: string; displayDate: string; timestamp: number; ayaanEarnings: number | null; ayaanTime: string | null; riyaanEarnings: number | null; riyaanTime: string | null; }
 
 const BARRON_RULES = [
-    'Synonym or antonym question for each word',
-    '4 options per question',
-    'Wrong answer = game over',
-    '50 seconds total timer',
-    '+1 per correct · −1 per wrong',
-    'One attempt per day'
+    "One attempt per student per day.",
+    "Sudden death: Game ends on the first wrong answer.",
+    "Identify the correct meaning for the given word.",
+    "Timer: 50 seconds to answer as many as you can.",
+    "A fresh set of 30 words is selected for each calendar month."
 ];
 
 export const Barron800View: React.FC<Props> = ({ onBack }) => {
@@ -52,7 +51,7 @@ export const Barron800View: React.FC<Props> = ({ onBack }) => {
         const h: GameSession[] = data.map((log: any) => {
             const pName = log.player_id === PLAYER_IDS.Ayaan ? 'Ayaan' : 'Riyaan';
             if (pName === 'Ayaan') aT += log.earnings; else rT += log.earnings;
-            return { id: log.id, player: pName, score: log.score, wrongCount: log.wrong_count, earnings: log.earnings, timestamp: new Date(log.played_at).getTime() };
+            return { id: log.id, player: pName, score: log.score, wrongCount: log.wrong_count, earnings: log.earnings, timestamp: new Date(log.played_at).getTime(), details: log.details };
         });
         setAyaanTotal(aT); setRiyaanTotal(rT); setHistory(h);
     }, []);
@@ -77,7 +76,7 @@ export const Barron800View: React.FC<Props> = ({ onBack }) => {
             const up = getUserProfile(selectedUser);
             const pid = up ? up.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
             const playedAt = new Date(getEffectiveDate().getTime());
-            await supabase.from('barron800_logs').insert({ player_id: pid, score: result.score, wrong_count: result.wrongCount, earnings, details: { questions: result.questions.map(q => ({ word: q.word, type: q.questionType, correct: q.isCorrect })) }, played_at: playedAt.toISOString() });
+            await supabase.from('barron800_logs').insert({ player_id: pid, score: result.score, wrong_count: result.wrongCount, earnings, details: { questions: result.questions.map(q => ({ word: q.word, meaning: q.meaning, type: q.questionType, correct: q.isCorrect })) }, played_at: playedAt.toISOString() });
 
             const todayIST = getISTDateKey(playedAt);
             localStorage.removeItem(`barron800_attempt_${selectedUser}_${todayIST}`);
@@ -87,7 +86,7 @@ export const Barron800View: React.FC<Props> = ({ onBack }) => {
         setSubView(SubView.RESULTS); isSubmittingRef.current = false;
     }, [selectedUser, getEffectiveDate, getUserProfile]);
 
-    const { currentQuestion, currentIndex, questions, score, wrongCount, timeLeft, answered, isCorrectAnswer, startGame: triggerStart, handleAnswer } = useVocabEngine(barron800 as VocabWord[], 50, 'barron800', finishGame);
+    const { currentQuestion, currentIndex, questions, score, wrongCount, timeLeft, answered, isCorrectAnswer, startGame: triggerStart, handleAnswer } = useVocabEngine(barron800 as VocabWord[], 30, 'barron800', finishGame);
 
     const startGame = () => {
         if (!isMarketOpenDay()) return alert("Market closed!");
@@ -107,7 +106,23 @@ export const Barron800View: React.FC<Props> = ({ onBack }) => {
 
     const groupedHistory = useMemo(() => {
         const g: Record<string, DailyRecord> = {};
-        history.forEach(s => { const dk = getISTDateKey(s.timestamp); if (!g[dk]) g[dk] = { dateKey: dk, displayDate: new Date(s.timestamp).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric' }), timestamp: s.timestamp, ayaanEarnings: null, riyaanEarnings: null }; if (s.player === 'Ayaan') g[dk].ayaanEarnings = (g[dk].ayaanEarnings || 0) + s.earnings; else g[dk].riyaanEarnings = (g[dk].riyaanEarnings || 0) + s.earnings; });
+        history.forEach(s => {
+            const dk = getISTDateKey(s.timestamp);
+            if (!g[dk]) g[dk] = {
+                dateKey: dk,
+                displayDate: new Date(s.timestamp).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric' }),
+                timestamp: s.timestamp,
+                ayaanEarnings: null, ayaanTime: null, riyaanEarnings: null, riyaanTime: null
+            };
+            const timeStr = new Date(s.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+            if (s.player === 'Ayaan') {
+                g[dk].ayaanEarnings = (g[dk].ayaanEarnings || 0) + s.earnings;
+                g[dk].ayaanTime = timeStr;
+            } else {
+                g[dk].riyaanEarnings = (g[dk].riyaanEarnings || 0) + s.earnings;
+                g[dk].riyaanTime = timeStr;
+            }
+        });
         return Object.values(g).sort((a, b) => b.timestamp - a.timestamp);
     }, [history]);
 

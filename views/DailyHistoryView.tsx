@@ -279,7 +279,12 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                 return (
                     <div className="space-y-3">
                         {vocabArray.map((vItem: any, i: number) => {
-                            const isCorrect = vItem.isCorrect;
+                            // Support both isCorrect (Word Power) and correct (Barron/Manhattan)
+                            const isCorrect = vItem.isCorrect !== undefined ? vItem.isCorrect : vItem.correct;
+                            const mainLabel = vItem.word || vItem.root || 'WORD';
+                            const subLabel = vItem.meaning || vItem.definition;
+                            const showSubLabel = subLabel && subLabel.toLowerCase() !== 'n/a';
+
                             return (
                                 <div key={i} className="flex items-start gap-4 p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-800 transition-all hover:shadow-sm">
                                     <div className={`mt-0.5 p-1 rounded-full flex-shrink-0 ${isCorrect ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-500' : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-500'}`}>
@@ -288,7 +293,7 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                                             <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest truncate">
-                                                {vItem.root || 'WORD'} <span className="text-slate-400 lowercase italic opacity-80">({vItem.meaning || 'N/A'})</span>
+                                                {mainLabel} {showSubLabel && <span className="text-slate-400 lowercase italic opacity-80">({subLabel})</span>}
                                             </p>
                                             {vItem.scoreChange !== undefined && (
                                                 <span className={`text-[9px] font-black px-1.5 py-0.5 rounded tabular-nums ${vItem.scoreChange > 0 ? 'bg-emerald-100/50 text-emerald-600' : vItem.scoreChange < 0 ? 'bg-rose-100/50 text-rose-600' : 'bg-slate-200 text-slate-500'}`}>
@@ -296,9 +301,11 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="text-sm font-black text-slate-700 dark:text-slate-200 leading-tight">
-                                            {vItem.question || vItem.word}
-                                        </p>
+                                        {vItem.question && vItem.question !== vItem.word && (
+                                            <p className="text-sm font-black text-slate-700 dark:text-slate-200 leading-tight">
+                                                {vItem.question}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             );

@@ -3,16 +3,18 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 export interface VocabWord {
     word: string;
     meaning: string;
-    synonyms: string[];
-    antonyms: string[];
+    definition?: string;
+    synonyms?: string[];
+    antonyms?: string[];
 }
 
 export interface VocabQuizQuestion {
     word: string;
-    questionType: 'synonym' | 'antonym';
+    questionType: 'synonym' | 'antonym' | 'meaning';
     correctAnswer: string;
     options: string[];
     correctIndex: number;
+    meaning: string;
 }
 
 export interface VocabResult {
@@ -27,25 +29,53 @@ function shuffleArray<T>(arr: T[]): T[] {
     return a;
 }
 
-function generateQuestions(words: VocabWord[], allWords: VocabWord[]): VocabQuizQuestion[] {
+function generateQuestions(words: VocabWord[], allWords: VocabWord[], forceMeaning: boolean = false): VocabQuizQuestion[] {
     const questions: VocabQuizQuestion[] = [];
     const shuffled = shuffleArray(words);
 
     for (const word of shuffled) {
-        // Decide synonym or antonym question
-        const hasSynonyms = word.synonyms.length > 0;
-        const hasAntonyms = word.antonyms.length > 0;
-        if (!hasSynonyms && !hasAntonyms) continue;
+        let qType: 'synonym' | 'antonym' | 'meaning' = 'meaning';
+        let correctAnswer = '';
+        let correctList: string[] = [];
 
-        const qType = hasSynonyms && hasAntonyms ? (Math.random() > 0.5 ? 'synonym' : 'antonym') : hasSynonyms ? 'synonym' : 'antonym';
-        const correctList = qType === 'synonym' ? word.synonyms : word.antonyms;
-        const correctAnswer = correctList[Math.floor(Math.random() * correctList.length)];
+        if (forceMeaning) {
+            qType = 'meaning';
+            correctAnswer = word.meaning;
+            correctList = [word.meaning];
+        } else {
+            // Decide synonym or antonym question
+            const synonyms = word.synonyms || [];
+            const antonyms = word.antonyms || [];
+            const hasSynonyms = synonyms.length > 0;
+            const hasAntonyms = antonyms.length > 0;
+
+            if (hasSynonyms && hasAntonyms) {
+                qType = Math.random() > 0.5 ? 'synonym' : 'antonym';
+                correctList = qType === 'synonym' ? synonyms : antonyms;
+                correctAnswer = correctList[Math.floor(Math.random() * correctList.length)];
+            } else if (hasSynonyms) {
+                qType = 'synonym';
+                correctList = synonyms;
+                correctAnswer = correctList[Math.floor(Math.random() * correctList.length)];
+            } else if (hasAntonyms) {
+                qType = 'antonym';
+                correctList = antonyms;
+                correctAnswer = correctList[Math.floor(Math.random() * correctList.length)];
+            } else {
+                qType = 'meaning';
+                correctAnswer = word.meaning;
+                correctList = [word.meaning];
+            }
+        }
+
+        if (!correctAnswer) continue;
 
         // Generate wrong options from other words
         const wrongPool: string[] = [];
         for (const other of allWords) {
             if (other.word === word.word) continue;
-            wrongPool.push(...other.synonyms, ...other.antonyms);
+            if (other.meaning) wrongPool.push(other.meaning);
+            if (other.synonyms) wrongPool.push(...other.synonyms);
         }
         const uniqueWrong = [...new Set(wrongPool)].filter(w => w !== correctAnswer && !correctList.includes(w));
         const wrongOptions = shuffleArray(uniqueWrong).slice(0, 3);
@@ -54,7 +84,7 @@ function generateQuestions(words: VocabWord[], allWords: VocabWord[]): VocabQuiz
         const allOptions = shuffleArray([correctAnswer, ...wrongOptions]);
         const correctIndex = allOptions.indexOf(correctAnswer);
 
-        questions.push({ word: word.word, questionType: qType, correctAnswer, options: allOptions, correctIndex });
+        questions.push({ word: word.word, questionType: qType, correctAnswer, options: allOptions, correctIndex, meaning: word.meaning });
     }
 
     return questions;
@@ -64,13 +94,14 @@ export const useVocabEngine = (
     wordList: VocabWord[],
     wordsPerMonth: number,
     gameKey: string,
-    onFinish: (result: VocabResult) => void
+    onFinish: (result: VocabResult) => void,
+    forceMeaning: boolean = false
 ) => {
     const [questions, setQuestions] = useState<VocabQuizQuestion[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [score, setScore] = useState(0);
     const [wrongCount, setWrongCount] = useState(0);
-    const [timeLeft, setTimeLeft] = useState(100);
+    const [timeLeft, setTimeLeft] = useState(50);
     const [isActive, setIsActive] = useState(false);
     const [answered, setAnswered] = useState<number | null>(null);
     const [isCorrectAnswer, setIsCorrectAnswer] = useState<boolean | null>(null);
@@ -98,7 +129,7 @@ export const useVocabEngine = (
         resultsRef.current = [];
 
         const monthWords = getMonthlyWords();
-        const qs = generateQuestions(monthWords, wordList);
+        const qs = generateQuestions(monthWords, wordList, forceMeaning);
         setQuestions(qs);
         setCurrentIndex(0);
         setScore(0);
@@ -106,8 +137,8 @@ export const useVocabEngine = (
         setAnswered(null);
         setIsCorrectAnswer(null);
 
-        endTimeRef.current = Date.now() + 100000;
-        setTimeLeft(100);
+        endTimeRef.current = Date.now() + 50000;
+        setTimeLeft(50);
         setIsActive(true);
     }, [getMonthlyWords, wordList]);
 
