@@ -182,18 +182,26 @@ export const MentalMathView: React.FC<MentalMathViewProps> = ({ onBack }) => {
             const userProfile = getUserProfile(selectedUser);
             const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
 
+            const playedAtDate = new Date(effectiveTime);
             const { error: insertError } = await supabase.from('mentalmath_logs').insert({
                 player_id: playerId,
                 score: stepsCompleted,
                 wrong_count: isCorrect ? 0 : 1,
                 earnings,
                 details: result,
-                played_at: new Date(effectiveTime).toISOString()
+                played_at: playedAtDate.toISOString()
             });
+
             if (insertError) {
                 console.error('❌ MentalMath log insert failed:', insertError);
             } else {
                 console.log('✅ MentalMath log saved successfully');
+                const todayIST = getISTDateKey(playedAtDate);
+                localStorage.removeItem(`mentalmath_attempt_${selectedUser}_${todayIST}`);
+                // Safely update history right away
+                setHistory(prev => [{
+                    id: crypto.randomUUID(), player: selectedUser, score: stepsCompleted, wrong: isCorrect ? 0 : 1, earnings, timestamp: playedAtDate.getTime(), details: result
+                }, ...prev]);
             }
         }
 
