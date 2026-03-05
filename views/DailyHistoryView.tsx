@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowLeft, IndianRupee, Calendar, User, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, IndianRupee, Calendar, User, Users, Activity, Clock } from 'lucide-react';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { getISTDateKey } from '../src/lib/dateUtils';
 
 interface DailyHistoryViewProps { onBack: () => void; }
 
-interface GameEntry { game: string; player: string; earnings: number; score: number; timestamp: number; }
-interface DaySummary {
-    dateKey: string;
-    displayDate: string;
-    games: GameEntry[];
-    ayaanTotal: number;
-    riyaanTotal: number;
+interface GameEntry {
+    id: string;
+    game: string;
+    player: string;
+    earnings: number;
+    score: number;
+    timestamp: number;
+    displayTime: string;
 }
 
 const GAME_TABLES = [
@@ -33,10 +34,14 @@ const GAME_TABLES = [
     { table: 'manhattan500_logs', game: 'Manhattan 500', earningsField: 'earnings', scoreField: 'score', dateField: 'played_at' },
 ];
 
+type PlayerFilter = 'All' | 'Ayaan' | 'Riyaan';
+
 export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) => {
     const [allEntries, setAllEntries] = useState<GameEntry[]>([]);
     const [loading, setLoading] = useState(true);
-    const [expandedDay, setExpandedDay] = useState<string | null>(null);
+
+    const [selectedDate, setSelectedDate] = useState<string>(getISTDateKey(new Date()));
+    const [playerFilter, setPlayerFilter] = useState<PlayerFilter>('All');
 
     const fetchAllData = useCallback(async () => {
         setLoading(true);
@@ -44,16 +49,20 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
 
         for (const gt of GAME_TABLES) {
             try {
-                const { data } = await supabase.from(gt.table).select('*').order(gt.dateField, { ascending: false }).limit(200);
+                // Increased limit to 1000 to ensure we have enough history for back-dates
+                const { data } = await supabase.from(gt.table).select('*').order(gt.dateField, { ascending: false }).limit(1000);
                 if (data) {
                     for (const row of data) {
                         const pName = (row.player_id === PLAYER_IDS.Ayaan) ? 'Ayaan' : (row.player_id === PLAYER_IDS.Riyaan) ? 'Riyaan' : (row.player || 'Unknown');
+                        const timestamp = new Date(row[gt.dateField] || row.created_at).getTime();
                         entries.push({
+                            id: row.id || crypto.randomUUID(),
                             game: gt.game,
                             player: pName,
                             earnings: row[gt.earningsField] || 0,
                             score: gt.scoreField ? (row[gt.scoreField] || 0) : 0,
-                            timestamp: new Date(row[gt.dateField] || row.created_at).getTime()
+                            timestamp: timestamp,
+                            displayTime: new Date(timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })
                         });
                     }
                 }
@@ -68,29 +77,30 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
 
     useEffect(() => { fetchAllData(); }, [fetchAllData]);
 
-    const daySummaries = useMemo(() => {
-        const groups: Record<string, DaySummary> = {};
-        allEntries.forEach(e => {
-            const dk = getISTDateKey(e.timestamp);
-            if (!groups[dk]) {
-                groups[dk] = {
-                    dateKey: dk,
-                    displayDate: new Date(e.timestamp).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric' }),
-                    games: [],
-                    ayaanTotal: 0,
-                    riyaanTotal: 0
-                };
-            }
-            groups[dk].games.push(e);
-            if (e.player === 'Ayaan') groups[dk].ayaanTotal += e.earnings;
-            else if (e.player === 'Riyaan') groups[dk].riyaanTotal += e.earnings;
-        });
-        return Object.values(groups).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
-    }, [allEntries]);
+    const filteredGames = useMemo(() => {
+        return allEntries
+            .filter(e => {
+                const dateMatch = getISTDateKey(e.timestamp) === selectedDate;
+                const playerMatch = playerFilter === 'All' || e.player === playerFilter;
+                return dateMatch && playerMatch;
+            })
+            .sort((a, b) => b.timestamp - a.timestamp); // Newest first
+    }, [allEntries, selectedDate, playerFilter]);
 
-    // Grand totals
-    const grandAyaan = daySummaries.reduce((sum, d) => sum + d.ayaanTotal, 0);
-    const grandRiyaan = daySummaries.reduce((sum, d) => sum + d.riyaanTotal, 0);
+    const totalEarnings = filteredGames.reduce((sum, g) => sum + g.earnings, 0);
+
+    const displayDateString = useMemo(() => {
+        const d = new Date(selectedDate);
+        if (isNaN(d.getTime())) return selectedDate;
+        return d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    }, [selectedDate]);
+
+    // Go to previous or next day
+    const offsetDate = (days: number) => {
+        const d = new Date(selectedDate);
+        d.setDate(d.getDate() + days);
+        setSelectedDate(getISTDateKey(d));
+    };
 
     if (loading) {
         return (
@@ -101,63 +111,128 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 animate-in fade-in duration-500">
-            <header className="flex items-center gap-4 mb-8">
-                <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white"><ArrowLeft size={24} /></button>
-                <div>
-                    <h1 className="text-xl font-bold text-slate-900 dark:text-white">Daily History Board</h1>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">All games · All players</p>
-                </div>
-            </header>
-
-            {/* Grand Totals */}
-            <div className="grid grid-cols-2 gap-4 mb-8 max-w-md mx-auto">
-                <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm text-center">
-                    <div className="flex items-center justify-center gap-2 mb-2"><User size={16} className="text-indigo-500" /><p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Ayaan</p></div>
-                    <div className={`flex items-center justify-center gap-1 text-2xl font-black ${grandAyaan >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}><IndianRupee size={20} />{grandAyaan}</div>
-                </div>
-                <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm text-center">
-                    <div className="flex items-center justify-center gap-2 mb-2"><Users size={16} className="text-rose-500" /><p className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Riyaan</p></div>
-                    <div className={`flex items-center justify-center gap-1 text-2xl font-black ${grandRiyaan >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}><IndianRupee size={20} />{grandRiyaan}</div>
-                </div>
-            </div>
-
-            {/* Daily Cards */}
-            <div className="max-w-md mx-auto space-y-3">
-                {daySummaries.length === 0 && <p className="text-sm text-slate-400 text-center py-8">No games played yet</p>}
-                {daySummaries.map(day => (
-                    <div key={day.dateKey} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
-                        <button onClick={() => setExpandedDay(expandedDay === day.dateKey ? null : day.dateKey)} className="w-full p-4 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <Calendar size={16} className="text-slate-400" />
-                                <span className="font-black text-sm text-slate-900 dark:text-white uppercase tracking-wider">{day.displayDate}</span>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="flex gap-3 text-sm font-black">
-                                    <span className={day.ayaanTotal >= 0 ? 'text-emerald-500' : 'text-rose-500'}>₹{day.ayaanTotal}</span>
-                                    <span className="text-slate-300">|</span>
-                                    <span className={day.riyaanTotal >= 0 ? 'text-emerald-500' : 'text-rose-500'}>₹{day.riyaanTotal}</span>
-                                </div>
-                                {expandedDay === day.dateKey ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-                            </div>
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 sm:p-8 animate-in fade-in duration-500 pb-32">
+            <div className="max-w-2xl mx-auto">
+                <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+                    <div className="flex items-center gap-4">
+                        <button onClick={onBack} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-900 dark:text-white bg-white dark:bg-slate-900 shadow-sm border border-slate-100 dark:border-slate-800">
+                            <ArrowLeft size={24} />
                         </button>
-                        {expandedDay === day.dateKey && (
-                            <div className="px-4 pb-4 space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3">
-                                {day.games.map((g, i) => (
-                                    <div key={i} className="flex items-center justify-between text-sm">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`w-2 h-2 rounded-full ${g.player === 'Ayaan' ? 'bg-indigo-500' : 'bg-rose-500'}`}></span>
-                                            <span className="font-bold text-slate-600 dark:text-slate-300">{g.game}</span>
-                                            <span className="text-[10px] text-slate-400">({g.player})</span>
-                                        </div>
-                                        <span className={`font-black ${g.earnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>₹{g.earnings}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        <div>
+                            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Timeline</h1>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Daily Activity Log</p>
+                        </div>
                     </div>
-                ))}
+
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 self-start sm:self-auto">
+                        <button onClick={() => setPlayerFilter('All')} className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-colors ${playerFilter === 'All' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                            All
+                        </button>
+                        <button onClick={() => setPlayerFilter('Ayaan')} className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-colors ${playerFilter === 'Ayaan' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                            Ayaan
+                        </button>
+                        <button onClick={() => setPlayerFilter('Riyaan')} className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-colors ${playerFilter === 'Riyaan' ? 'bg-rose-500 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                            Riyaan
+                        </button>
+                    </div>
+                </header>
+
+                {/* Date Controls */}
+                <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-xl p-6 sm:p-8 mb-8 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+                        <Calendar size={120} />
+                    </div>
+
+                    <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <Calendar size={16} className="text-slate-400" />
+                                <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Selected Date</h2>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => offsetDate(-1)} className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-slate-600 dark:text-slate-300 transition-colors font-bold text-sm">
+                                    -1d
+                                </button>
+                                <input
+                                    type="date"
+                                    value={selectedDate}
+                                    onChange={(e) => setSelectedDate(e.target.value)}
+                                    className="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-2 rounded-xl font-bold uppercase text-sm border-none focus:ring-2 focus:ring-indigo-500 outline-none"
+                                />
+                                <button onClick={() => offsetDate(1)} className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-slate-600 dark:text-slate-300 transition-colors font-bold text-sm" disabled={selectedDate === getISTDateKey(new Date())}>
+                                    +1d
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="sm:text-right border-t sm:border-t-0 sm:border-l border-slate-100 dark:border-slate-800 pt-6 sm:pt-0 sm:pl-6 w-full sm:w-auto">
+                            <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                {playerFilter === 'All' ? 'Combined Total' : `${playerFilter}'s Total`}
+                            </h2>
+                            <div className={`text-4xl font-black tabular-nums tracking-tight ${totalEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                ₹{totalEarnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Game List */}
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between px-2 mb-2">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Activity Log ({filteredGames.length})</h3>
+                        <span className="text-xs font-bold text-slate-400">{displayDateString}</span>
+                    </div>
+
+                    {filteredGames.length === 0 ? (
+                        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-12 text-center shadow-sm">
+                            <Activity size={48} className="mx-auto text-slate-200 dark:text-slate-800 mb-4" />
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">No Activity Found</h3>
+                            <p className="text-slate-500 text-sm">No games were played on this date matching the current filter.</p>
+                        </div>
+                    ) : (
+                        <div className="grid gap-3">
+                            {filteredGames.map((game) => (
+                                <div key={game.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between group hover:border-slate-200 dark:hover:border-slate-700 transition-colors">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${game.player === 'Ayaan' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500' :
+                                                game.player === 'Riyaan' ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-500' :
+                                                    'bg-slate-50 dark:bg-slate-800 text-slate-500'
+                                            }`}>
+                                            {game.player === 'Ayaan' ? <User size={24} /> : game.player === 'Riyaan' ? <Users size={24} /> : <Activity size={24} />}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{game.game}</h4>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className={`text-[10px] font-black uppercase tracking-widest ${game.player === 'Ayaan' ? 'text-indigo-500' : 'text-rose-500'
+                                                    }`}>
+                                                    {game.player}
+                                                </span>
+                                                <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600"></span>
+                                                <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                                                    <Clock size={10} />
+                                                    {game.displayTime}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="text-right">
+                                        <div className={`text-lg font-black tabular-nums ${game.earnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                            {game.earnings >= 0 ? '+' : ''}₹{game.earnings}
+                                        </div>
+                                        {game.score > 0 && typeof game.score === 'number' && (
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                                                Score: {game.score}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
 };
+
