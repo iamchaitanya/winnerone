@@ -249,19 +249,18 @@ export const useMentalMathEngine = (
             return;
         }
 
-        if (val === 'DEL') {
-            setUserInput(prev => {
-                const next = prev.slice(0, -1);
-                userInputRef.current = next;
-                return next;
-            });
-            return;
-        }
-
-        if (userInput.length < 6) {
+        if (userInput.length < 3) {
             setUserInput(prev => {
                 const next = prev + val;
                 userInputRef.current = next;
+
+                if (next.length === 3) {
+                    // Small timeout allows UI to render the 3rd digit before ending the phase
+                    setTimeout(() => {
+                        submitAnswer();
+                    }, 50);
+                }
+
                 return next;
             });
         }

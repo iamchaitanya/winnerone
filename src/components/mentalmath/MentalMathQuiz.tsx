@@ -120,23 +120,9 @@ export const MentalMathQuiz: React.FC<MentalMathQuizProps> = ({
                 </button>
                 <button
                     onClick={() => onKeyClick('0')}
-                    className="h-16 bg-slate-50 dark:bg-slate-900 text-2xl font-black text-slate-900 dark:text-white rounded-2xl active:bg-slate-200 shadow-sm transition-transform active:scale-95"
+                    className="h-16 bg-slate-50 dark:bg-slate-900 text-2xl font-black text-slate-900 dark:text-white rounded-2xl active:bg-slate-200 shadow-sm transition-transform active:scale-95 col-span-2"
                 >
                     0
-                </button>
-                <button
-                    onClick={() => onKeyClick('DEL')}
-                    className="h-16 bg-rose-50 dark:bg-rose-900/30 text-xl font-black text-rose-600 dark:text-rose-400 rounded-2xl active:bg-rose-100 shadow-sm transition-transform active:scale-95 flex items-center justify-center"
-                >
-                    <Delete size={22} />
-                </button>
-            </div>
-            <div className="max-w-xs mx-auto w-full mb-4">
-                <button
-                    onClick={onSubmit}
-                    className="w-full h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg shadow-emerald-500/20 uppercase tracking-wider"
-                >
-                    <Send size={18} /> SUBMIT
                 </button>
             </div>
         </div>
