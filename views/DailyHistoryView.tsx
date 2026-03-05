@@ -324,8 +324,60 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                 );
 
             case 'Sudoku':
+                const sudokuData = details || {};
+                const sScore = sudokuData.score || 0;
+                const sWrong = sudokuData.wrong !== undefined ? sudokuData.wrong : 0;
+
+                return (
+                    <div className="overflow-x-auto pb-4">
+                        <table className="w-full text-left table-auto">
+                            <thead>
+                                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Correct</th>
+                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Mistakes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                    <td className="px-4 py-4 text-center border-r border-slate-50 dark:border-slate-800/50">
+                                        <span className="text-sm font-black text-emerald-500 tabular-nums">{sScore}</span>
+                                    </td>
+                                    <td className="px-4 py-4 text-center">
+                                        <span className={`text-sm font-black tabular-nums ${sWrong > 0 ? 'text-rose-500' : 'text-slate-400'}`}>{sWrong}</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                );
+
             case 'Memory':
-                return <div className="text-xs text-slate-400 italic py-2 text-center bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4">Detailed granular logs are not supported for this game yet.</div>;
+                const memData = details || {};
+                const mScore = memData.score || 0;
+                const mLevel = memData.level_reached || 1;
+
+                return (
+                    <div className="overflow-x-auto pb-4">
+                        <table className="w-full text-left table-auto">
+                            <thead>
+                                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Score</th>
+                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Level Reached</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                    <td className="px-4 py-4 text-center border-r border-slate-50 dark:border-slate-800/50">
+                                        <span className="text-sm font-black text-emerald-500 tabular-nums">{mScore}</span>
+                                    </td>
+                                    <td className="px-4 py-4 text-center">
+                                        <span className="text-sm font-black text-indigo-500 tabular-nums">Lv {mLevel}</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                );
 
             default:
                 return null;
