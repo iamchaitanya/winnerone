@@ -21,12 +21,19 @@ export const MathMasteryQuiz: React.FC<MathMasteryQuizProps> = ({
     // Keyboard support
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key >= '0' && e.key <= '9') onKeyClick(e.key);
-            else if (e.key === '.') onKeyClick('.');
-            else if (e.key === 'Backspace') onKeyClick('del');
-            else if (e.key === 'Enter') onKeyClick('enter');
-            else if (e.key === 'Escape') onKeyClick('clear');
-            else if (e.key === 'ArrowRight') onKeyClick('skip');
+            if (e.key >= '0' && e.key <= '9') {
+                e.preventDefault();
+                onKeyClick(e.key);
+            } else if (e.key === '.') {
+                e.preventDefault();
+                onKeyClick('.');
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                onKeyClick('enter');
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                onKeyClick('clear');
+            }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
@@ -92,25 +99,14 @@ export const MathMasteryQuiz: React.FC<MathMasteryQuizProps> = ({
                 >
                     0
                 </button>
-                <button
-                    onClick={() => onKeyClick('del')}
-                    className="h-14 sm:h-16 bg-rose-50 dark:bg-rose-900/20 text-2xl font-black text-rose-500 dark:text-rose-400 rounded-2xl active:bg-rose-100 shadow-sm transition-transform active:scale-95 flex items-center justify-center p-0"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Z" /><line x1="18" x2="12" y1="9" y2="15" /><line x1="12" x2="18" y1="9" y2="15" /></svg>
-                </button>
+                <div className="h-14 sm:h-16 bg-transparent" />
             </div>
 
-            <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto w-full pb-8">
-                <button
-                    onClick={() => onKeyClick('skip')}
-                    className="h-14 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-2xl font-black active:scale-95 transition-transform flex items-center justify-center gap-2 uppercase tracking-widest text-xs"
-                >
-                    <SkipForward size={16} /> Skip
-                </button>
+            <div className="grid grid-cols-1 gap-3 max-w-xs mx-auto w-full pb-8">
                 <button
                     onClick={() => onKeyClick('enter')}
                     disabled={!userInput}
-                    className={`h-14 rounded-2xl font-black active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs ${userInput ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 opacity-50'}`}
+                    className={`h-14 rounded-2xl font-black active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs ${userInput ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-100 dark:bg-slate-900 text-slate-400 opacity-50'}`}
                 >
                     Enter <Send size={16} />
                 </button>
