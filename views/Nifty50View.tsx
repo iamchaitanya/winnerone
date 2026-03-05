@@ -99,19 +99,21 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
 
   const hasPlayedToday = useCallback((player: string | null) => {
     if (!player) return false;
-    const today = getEffectiveDate().toDateString();
-    return niftyHistory.some(s => s.player === player && new Date(s.timestamp).toDateString() === today);
+    const today = getISTDateKey(getEffectiveDate());
+    if (niftyHistory.some(s => s.player === player && getISTDateKey(s.timestamp) === today)) return true;
+    // Check local storage for crash protection
+    return localStorage.getItem(`nifty_attempt_${player}_${today}`) === 'started';
   }, [niftyHistory, getEffectiveDate]);
 
   const getTodaySession = useCallback((player: string | null) => {
-    const today = getEffectiveDate().toDateString();
-    return niftyHistory.find(s => s.player === player && new Date(s.timestamp).toDateString() === today) || null;
+    const today = getISTDateKey(getEffectiveDate());
+    return niftyHistory.find(s => s.player === player && getISTDateKey(s.timestamp) === today) || null;
   }, [niftyHistory, getEffectiveDate]);
 
   const getSiblingTodaySession = useCallback((player: string | null) => {
     const sibling = player === 'Ayaan' ? 'Riyaan' : 'Ayaan';
-    const today = getEffectiveDate().toDateString();
-    return niftyHistory.find(s => s.player === sibling && new Date(s.timestamp).toDateString() === today) || null;
+    const today = getISTDateKey(getEffectiveDate());
+    return niftyHistory.find(s => s.player === sibling && getISTDateKey(s.timestamp) === today) || null;
   }, [niftyHistory, getEffectiveDate]);
 
   const handleUserSelect = (user: string) => {
@@ -124,6 +126,9 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
     setIsSubmitting(true);
     const todayStr = getISTDateKey(getEffectiveDate());
 
+    // Set lock immediately to avoid rapid double-clicks
+    localStorage.setItem(`nifty_attempt_${selectedUser}_${todayStr}`, 'started');
+
     const userProfile = profiles.find(p => p.player_name === selectedUser);
     const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
 
@@ -135,9 +140,14 @@ export const Nifty50View: React.FC<Nifty50ViewProps> = ({ onBack }) => {
         stock_symbol: symbol
       }]);
       if (error) throw error;
+
+      // Clear on success as DB contains truth
+      localStorage.removeItem(`nifty_attempt_${selectedUser}_${todayStr}`);
       setSubView(NiftySubView.RESULTS);
     } catch (err) {
       alert('Failed to save pick.');
+      // Remove lock on failure so they can try again
+      localStorage.removeItem(`nifty_attempt_${selectedUser}_${todayStr}`);
     } finally {
       setIsSubmitting(false);
     }

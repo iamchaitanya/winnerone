@@ -61,7 +61,13 @@ export const Manhattan500View: React.FC<Props> = ({ onBack }) => {
 
     const getEffectiveDate = useCallback(() => { if (dateOverride) { const d = new Date(dateOverride); if (isNaN(d.getTime())) return new Date(); if (!dateOverride.includes('T')) { const now = new Date(); const [y, m, day] = dateOverride.split('-').map(Number); const ld = new Date(); ld.setFullYear(y, m - 1, day); ld.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds()); return ld; } return d; } return new Date(); }, [dateOverride]);
     const isMarketOpenDay = useCallback(() => { const d = getEffectiveDate(); return !(d.getDay() === 0 || d.getDay() === 6) && !isMarketHoliday(getISTDateKey(d)); }, [getEffectiveDate]);
-    const hasPlayedToday = useCallback((p: string | null) => { if (!p) return false; const t = getISTDateKey(getEffectiveDate()); return history.some(s => s.player === p && getISTDateKey(s.timestamp) === t); }, [history, getEffectiveDate]);
+    const hasPlayedToday = useCallback((p: string | null) => {
+        if (!p) return false;
+        const t = getISTDateKey(getEffectiveDate());
+        if (history.some(s => s.player === p && getISTDateKey(s.timestamp) === t)) return true;
+        // Check local storage for crash protection
+        return localStorage.getItem(`manhattan500_attempt_${p}_${t}`) === 'started';
+    }, [history, getEffectiveDate]);
 
     const finishGame = useCallback(async (result: VocabResult) => {
         if (isSubmittingRef.current) return; isSubmittingRef.current = true;
@@ -72,6 +78,9 @@ export const Manhattan500View: React.FC<Props> = ({ onBack }) => {
             const pid = up ? up.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
             const playedAt = new Date(getEffectiveDate().getTime());
             await supabase.from('manhattan500_logs').insert({ player_id: pid, score: result.score, wrong_count: result.wrongCount, earnings, details: { questions: result.questions.map(q => ({ word: q.word, type: q.questionType, correct: q.isCorrect })) }, played_at: playedAt.toISOString() });
+
+            const todayIST = getISTDateKey(playedAt);
+            localStorage.removeItem(`manhattan500_attempt_${selectedUser}_${todayIST}`);
 
             // Optimistically update local history so "hasPlayedToday" works immediately before realtime sync catches up
             setHistory(prev => [{
@@ -86,6 +95,12 @@ export const Manhattan500View: React.FC<Props> = ({ onBack }) => {
     const startGame = () => {
         if (!isMarketOpenDay()) return alert("Market closed!");
         if (hasPlayedToday(selectedUser)) return alert("Already played today!");
+
+        if (selectedUser) {
+            const todayIST = getISTDateKey(getEffectiveDate());
+            localStorage.setItem(`manhattan500_attempt_${selectedUser}_${todayIST}`, 'started');
+        }
+
         triggerStart(); setSubView(SubView.GAME);
     };
 

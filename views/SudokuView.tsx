@@ -86,7 +86,9 @@ export const SudokuView: React.FC<SudokuViewProps> = ({ onBack }) => {
     const hasPlayedToday = useCallback((player: string | null) => {
         if (!player) return false;
         const todayIST = getISTDateKey(getEffectiveDate());
-        return history.some(s => s.player === player && getISTDateKey(s.timestamp) === todayIST);
+        if (history.some(s => s.player === player && getISTDateKey(s.timestamp) === todayIST)) return true;
+        // Check local storage for crash protection
+        return localStorage.getItem(`sudoku_attempt_${player}_${todayIST}`) === 'started';
     }, [history, getEffectiveDate]);
 
     const getTodaySession = useCallback((player: string | null) => {
@@ -116,6 +118,8 @@ export const SudokuView: React.FC<SudokuViewProps> = ({ onBack }) => {
             if (insertError) {
                 console.error("Supabase insert error for sudoku_logs:", insertError);
             } else {
+                const todayIST = getISTDateKey(playedAt);
+                localStorage.removeItem(`sudoku_attempt_${selectedUser}_${todayIST}`);
                 setHistory(prev => [{
                     id: crypto.randomUUID(), player: selectedUser, score: result.correct, wrong: result.wrong, earnings, timestamp: playedAt.getTime(),
                     grid: result.grid, solution: result.solution, clues: result.clues
@@ -135,6 +139,12 @@ export const SudokuView: React.FC<SudokuViewProps> = ({ onBack }) => {
     const startGame = () => {
         if (!isMarketOpenDay()) return alert("Market closed!");
         if (hasPlayedToday(selectedUser)) return alert("Already played today!");
+
+        if (selectedUser) {
+            const todayIST = getISTDateKey(getEffectiveDate());
+            localStorage.setItem(`sudoku_attempt_${selectedUser}_${todayIST}`, 'started');
+        }
+
         triggerEngineStart();
         setSubView(SubView.GAME);
     };

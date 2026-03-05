@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo} from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { isMarketHoliday } from '../src/lib/holidayManager';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
@@ -59,7 +59,7 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   }, [dateOverride]);
 
   const isWeekend = (date: Date) => date.getDay() === 0 || date.getDay() === 6;
-  
+
   const isMarketOpenDay = useCallback(() => {
     const d = getEffectiveDate();
     return !isWeekend(d) && !isMarketHoliday(getLocalDateString(d));
@@ -76,7 +76,9 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const hasPlayedToday = useCallback((player: string | null) => {
     if (!player) return false;
     const todayStr = getLocalDateString(getEffectiveDate());
-    return sensexHistory.some(s => s.player === player && s.date === todayStr);
+    if (sensexHistory.some(s => s.player === player && s.date === todayStr)) return true;
+    // Check local storage for crash protection
+    return localStorage.getItem(`sensex_attempt_${player}_${todayStr}`) === 'started';
   }, [sensexHistory, getEffectiveDate]);
 
   useEffect(() => {
@@ -86,7 +88,7 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         .from('sensex_logs')
         .select('*')
         .order('date', { ascending: false });
-        
+
       if (error) return;
       if (data && isMounted) setSensexHistory(data);
     };
@@ -105,13 +107,13 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     };
   }, []);
 
-  const ayaanTotal = useMemo(() => 
+  const ayaanTotal = useMemo(() =>
     sensexHistory.filter(s => s.player === 'Ayaan' && s.is_settled).reduce((t, s) => t + (Number(s.earnings) || 0), 0)
-  , [sensexHistory]);
+    , [sensexHistory]);
 
-  const riyaanTotal = useMemo(() => 
+  const riyaanTotal = useMemo(() =>
     sensexHistory.filter(s => s.player === 'Riyaan' && s.is_settled).reduce((t, s) => t + (Number(s.earnings) || 0), 0)
-  , [sensexHistory]);
+    , [sensexHistory]);
 
   const groupedHistory = useMemo(() => {
     const groups: Record<string, any> = {};
@@ -134,20 +136,29 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     setUserPrediction(prediction);
 
     const todayStr = getLocalDateString(getEffectiveDate());
+
+    // Set lock immediately to avoid rapid double-clicks
+    localStorage.setItem(`sensex_attempt_${selectedUser}_${todayStr}`, 'started');
+
     const userProfile = profiles.find(p => p.player_name === selectedUser);
     const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
 
     try {
-      const { error } = await supabase.from('sensex_logs').insert([{ 
-        date: todayStr, 
+      const { error } = await supabase.from('sensex_logs').insert([{
+        date: todayStr,
         player_id: playerId,
-        player: selectedUser, 
-        prediction: prediction 
+        player: selectedUser,
+        prediction: prediction
       }]);
       if (error) throw error;
+
+      // Clear on success as DB contains truth
+      localStorage.removeItem(`sensex_attempt_${selectedUser}_${todayStr}`);
       setSubView(SensexSubView.RESULTS);
     } catch (err) {
       alert('Failed to save prediction.');
+      // Remove lock on failure so they can try again
+      localStorage.removeItem(`sensex_attempt_${selectedUser}_${todayStr}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -161,9 +172,9 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   switch (subView) {
     case SensexSubView.HUB:
       return (
-        <SensexHub 
-          onBack={onBack} 
-          onNavigate={(v: any) => setSubView(v)} 
+        <SensexHub
+          onBack={onBack}
+          onNavigate={(v: any) => setSubView(v)}
           onUserSelect={handleUserSelect}
           isMarketOpenDay={isMarketOpenDay()}
           isBeforePickDeadline={isBeforePickDeadline()}
@@ -184,36 +195,36 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       const todayStr = getLocalDateString(getEffectiveDate());
       const record = sensexHistory.find(s => s.player === selectedUser && s.date === todayStr);
       return (
-        <SensexResults 
+        <SensexResults
           prediction={userPrediction || record?.prediction || 'UP'}
           isSettled={record?.is_settled}          // Add this line
           earnings={record?.earnings}             // Add this line
           actualReturn={record?.actual_return}    // Add this line
           closingValue={record?.closing_value} // Pass the new data here
-          onContinue={() => { setUserPrediction(null); setSubView(SensexSubView.HUB); }} 
+          onContinue={() => { setUserPrediction(null); setSubView(SensexSubView.HUB); }}
         />
       );
     }
     case SensexSubView.DASHBOARD:
       return <SensexLeaderboard ayaanTotal={ayaanTotal} riyaanTotal={riyaanTotal} groupedHistory={groupedHistory} onBack={() => setSubView(SensexSubView.HUB)} />;
-      case SensexSubView.HISTORY:
-        return (
-          <div className="p-4 max-w-md mx-auto"> {/* Changed from 4xl to md for a tighter fit */}
-            <div className="flex items-center gap-3 mb-4">
-              <button onClick={() => setSubView(SensexSubView.HUB)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
-                <ArrowLeft size={20} className="text-slate-600 dark:text-slate-400" />
-              </button>
-              <h1 className="text-xl font-black text-slate-900 dark:text-white">Daily Performance</h1>
-            </div>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-lg border border-slate-100 dark:border-slate-800">
-              <SensexHistory groupedHistory={groupedHistory} />
-            </div>
+    case SensexSubView.HISTORY:
+      return (
+        <div className="p-4 max-w-md mx-auto"> {/* Changed from 4xl to md for a tighter fit */}
+          <div className="flex items-center gap-3 mb-4">
+            <button onClick={() => setSubView(SensexSubView.HUB)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+              <ArrowLeft size={20} className="text-slate-600 dark:text-slate-400" />
+            </button>
+            <h1 className="text-xl font-black text-slate-900 dark:text-white">Daily Performance</h1>
           </div>
-        );
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-lg border border-slate-100 dark:border-slate-800">
+            <SensexHistory groupedHistory={groupedHistory} />
+          </div>
+        </div>
+      );
       return (
         <div className="p-4 max-w-4xl mx-auto"> {/* Wider container for the table */}
           <div className="flex items-center gap-4 mb-6">
-            <button 
+            <button
               onClick={() => setSubView(SensexSubView.HUB)}
               className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
             >
@@ -221,49 +232,49 @@ export const SensexView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             </button>
             <h1 className="text-2xl font-black text-slate-900 dark:text-white">Daily Performance</h1>
           </div>
-          
+
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800">
             {/* Pass groupedHistory here */}
             <SensexHistory groupedHistory={groupedHistory} />
           </div>
         </div>
       );
-        return (
-          <div className="p-4 max-w-2xl mx-auto">
-            <div className="flex items-center gap-4 mb-6">
-              <button 
-                onClick={() => setSubView(SensexSubView.HUB)}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
-              >
-                <ArrowLeft size={24} className="text-slate-600 dark:text-slate-400" />
-              </button>
-              <h1 className="text-2xl font-black text-slate-900 dark:text-white">Performance Log</h1>
-            </div>
-            
-            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800">
-              {/* Make sure this says 'history' and not 'groupedHistory' */}
-              <SensexHistory history={sensexHistory || []} />
-            </div>
+      return (
+        <div className="p-4 max-w-2xl mx-auto">
+          <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={() => setSubView(SensexSubView.HUB)}
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+            >
+              <ArrowLeft size={24} className="text-slate-600 dark:text-slate-400" />
+            </button>
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white">Performance Log</h1>
           </div>
-        );
-        return (
-          <div className="p-4 max-w-2xl mx-auto">
-            <div className="flex items-center gap-4 mb-6">
-              <button 
-                onClick={() => setSubView(SensexSubView.HUB)}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
-              >
-                <ArrowLeft size={24} className="text-slate-600 dark:text-slate-400" />
-              </button>
-              <h1 className="text-2xl font-black text-slate-900 dark:text-white">Performance Log</h1>
-            </div>
-            
-            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800">
-              {/* FIX: Change prop name from groupedHistory to history */}
-              <SensexHistory history={sensexHistory || []} />
-            </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800">
+            {/* Make sure this says 'history' and not 'groupedHistory' */}
+            <SensexHistory history={sensexHistory || []} />
           </div>
-        );
+        </div>
+      );
+      return (
+        <div className="p-4 max-w-2xl mx-auto">
+          <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={() => setSubView(SensexSubView.HUB)}
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+            >
+              <ArrowLeft size={24} className="text-slate-600 dark:text-slate-400" />
+            </button>
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white">Performance Log</h1>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800">
+            {/* FIX: Change prop name from groupedHistory to history */}
+            <SensexHistory history={sensexHistory || []} />
+          </div>
+        </div>
+      );
     default:
       return null;
   }

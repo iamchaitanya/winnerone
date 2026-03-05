@@ -74,7 +74,9 @@ export const MemoryView: React.FC<MemoryViewProps> = ({ onBack }) => {
     const hasPlayedToday = useCallback((player: string | null) => {
         if (!player) return false;
         const todayIST = getISTDateKey(getEffectiveDate());
-        return history.some(s => s.player === player && getISTDateKey(s.timestamp) === todayIST);
+        if (history.some(s => s.player === player && getISTDateKey(s.timestamp) === todayIST)) return true;
+        // Check local storage for crash protection
+        return localStorage.getItem(`memory_attempt_${player}_${todayIST}`) === 'started';
     }, [history, getEffectiveDate]);
 
     const finishGame = useCallback(async (result: MemoryResult) => {
@@ -88,14 +90,19 @@ export const MemoryView: React.FC<MemoryViewProps> = ({ onBack }) => {
             const userProfile = getUserProfile(selectedUser);
             const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
             const playedAt = new Date(getEffectiveDate().getTime());
-            await supabase.from('memory_logs').insert({
+            const { error } = await supabase.from('memory_logs').insert({
                 player_id: playerId, score: result.totalScore, level_reached: result.reachedLevel4 ? 4 : 3, earnings,
                 details: result, played_at: playedAt.toISOString()
             });
-            setHistory(prev => [{
-                id: crypto.randomUUID(), player: selectedUser, score: result.totalScore, levelReached: result.reachedLevel4 ? 4 : 3, earnings, timestamp: playedAt.getTime(),
-                grid: result.grid, clickedNumbers: result.clickedNumbers, wrongClick: result.wrongClick
-            }, ...prev]);
+
+            if (!error) {
+                const todayIST = getISTDateKey(playedAt);
+                localStorage.removeItem(`memory_attempt_${selectedUser}_${todayIST}`);
+                setHistory(prev => [{
+                    id: crypto.randomUUID(), player: selectedUser, score: result.totalScore, levelReached: result.reachedLevel4 ? 4 : 3, earnings, timestamp: playedAt.getTime(),
+                    grid: result.grid, clickedNumbers: result.clickedNumbers, wrongClick: result.wrongClick
+                }, ...prev]);
+            }
         }
         setSubView(SubView.RESULTS);
         isSubmittingRef.current = false;
@@ -106,6 +113,12 @@ export const MemoryView: React.FC<MemoryViewProps> = ({ onBack }) => {
     const startGame = () => {
         if (!isMarketOpenDay()) return alert("Market closed!");
         if (hasPlayedToday(selectedUser)) return alert("Already played today!");
+
+        if (selectedUser) {
+            const todayIST = getISTDateKey(getEffectiveDate());
+            localStorage.setItem(`memory_attempt_${selectedUser}_${todayIST}`, 'started');
+        }
+
         triggerStart();
         setSubView(SubView.GAME);
     };
