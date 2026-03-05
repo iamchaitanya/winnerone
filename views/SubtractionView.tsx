@@ -208,6 +208,8 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
                 console.error('❌ Subtraction log insert failed:', insertError);
             } else {
                 console.log('✅ Subtraction log saved successfully');
+                const todayIST = getISTDateKey(new Date(effectiveTime));
+                localStorage.removeItem(`subtraction_attempt_${selectedUser}_${todayIST}`);
             }
         }
 

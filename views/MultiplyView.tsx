@@ -102,10 +102,17 @@ export const MultiplyView: React.FC<MultiplyViewProps> = ({ onBack }) => {
         if (selectedUser) {
             const up = getUserProfile(selectedUser);
             const pid = up ? up.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
-            await supabase.from('multiply_logs').insert({
+            const { error: insertError } = await supabase.from('multiply_logs').insert({
                 player_id: pid, score: fScore, wrong_count: fWrong, earnings, details: fResults,
                 played_at: new Date(getEffectiveDate().getTime()).toISOString()
             });
+            if (insertError) {
+                console.error('❌ Multiply log insert failed:', insertError);
+            } else {
+                console.log('✅ Multiply log saved successfully');
+                const todayIST = getISTDateKey(new Date(getEffectiveDate().getTime()));
+                localStorage.removeItem(`multiply_attempt_${selectedUser}_${todayIST}`);
+            }
             await syncWithCloud();
         }
         setSubView(SV.RESULTS); isSubmittingRef.current = false;

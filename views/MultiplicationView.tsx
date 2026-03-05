@@ -165,6 +165,8 @@ export const MultiplicationView: React.FC<MultiplicationViewProps> = ({ onBack }
                 console.error('❌ Multiplication log insert failed:', insertError);
             } else {
                 console.log('✅ Multiplication log saved successfully');
+                const todayIST = getISTDateKey(new Date(effectiveTime));
+                localStorage.removeItem(`multiplication_attempt_${selectedUser}_${todayIST}`);
             }
         }
         setSubView(MulSubView.RESULTS);

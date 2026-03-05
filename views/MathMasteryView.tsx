@@ -168,6 +168,8 @@ export const MathMasteryView: React.FC<MathMasteryViewProps> = ({ onBack }) => {
                 console.error('❌ Math Mastery log insert failed:', insertError);
             } else {
                 console.log('✅ Math Mastery log saved successfully');
+                const todayIST = getISTDateKey(new Date(effectiveTime));
+                localStorage.removeItem(`mathmastery_attempt_${selectedUser}_${todayIST}`);
             }
         }
 

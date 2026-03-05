@@ -124,6 +124,8 @@ export const Multiplication25View: React.FC<Multiplication25ViewProps> = ({ onBa
                 console.error('❌ Multiplication25 log insert failed:', insertError);
             } else {
                 console.log('✅ Multiplication25 log saved successfully');
+                const todayIST = getISTDateKey(new Date(effectiveTime));
+                localStorage.removeItem(`multiplication25_attempt_${selectedUser}_${todayIST}`);
             }
         }
         setSubView(Mul25SubView.RESULTS);

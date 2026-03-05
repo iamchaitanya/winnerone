@@ -200,7 +200,7 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
       const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
 
       // Save with a strict ISO string to avoid shifting
-      await supabase.from('addition_logs').insert({
+      const { error: insertError } = await supabase.from('addition_logs').insert({
         player_id: playerId,
         score: fScore,
         wrong_count: fWrong,
@@ -208,6 +208,13 @@ export const AdditionView: React.FC<AdditionViewProps> = ({ onBack }) => {
         details: fResults,
         played_at: new Date(effectiveTime).toISOString()
       });
+      if (insertError) {
+        console.error('❌ Addition log insert failed:', insertError);
+      } else {
+        console.log('✅ Addition log saved successfully');
+        const todayIST = getISTDateKey(new Date(effectiveTime));
+        localStorage.removeItem(`addition_attempt_${selectedUser}_${todayIST}`);
+      }
     }
 
     setSubView(AdditionSubView.RESULTS);

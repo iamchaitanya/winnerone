@@ -112,6 +112,9 @@ export const DivideView: React.FC<DivideViewProps> = ({ onBack }) => {
             if (insertError) {
                 alert("INSERT ERROR: " + JSON.stringify(insertError) + " PAYLOAD: " + JSON.stringify(payload));
                 console.error("Supabase insert error:", insertError, payload);
+            } else {
+                const todayIST = getISTDateKey(new Date(getEffectiveDate().getTime()));
+                localStorage.removeItem(`divide_attempt_${selectedUser}_${todayIST}`);
             }
             await syncWithCloud();
         }
