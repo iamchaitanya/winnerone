@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowLeft, Calendar, User, Users, Activity, Clock, ChevronDown, ChevronUp, Check, X } from 'lucide-react';
+import { ArrowLeft, Calendar, User, Users, Activity, Clock, ChevronDown, ChevronUp, Check, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { getISTDateKey } from '../src/lib/dateUtils';
@@ -26,8 +26,8 @@ const GAME_TABLES = [
     { table: 'divide_logs', game: 'Divide', earningsField: 'earnings', scoreField: 'score', dateField: 'played_at' },
     { table: 'mentalmath_logs', game: 'Mental Math', earningsField: 'earnings', scoreField: 'score', dateField: 'played_at' },
     { table: 'mathmastery_logs', game: 'Math Mastery', earningsField: 'earnings', scoreField: 'score', dateField: 'played_at' },
-    { table: 'nifty_logs', game: 'Nifty 50', earningsField: 'earnings', scoreField: null, dateField: 'played_at' },
-    { table: 'sensex_logs', game: 'Sensex', earningsField: 'earnings', scoreField: null, dateField: 'played_at' },
+    { table: 'nifty_logs', game: 'Nifty 50', earningsField: 'earnings', scoreField: null, dateField: 'created_at' },
+    { table: 'sensex_logs', game: 'Sensex', earningsField: 'earnings', scoreField: null, dateField: 'created_at' },
     { table: 'sudoku_logs', game: 'Sudoku', earningsField: 'earnings', scoreField: 'score', dateField: 'played_at' },
     { table: 'memory_logs', game: 'Memory', earningsField: 'earnings', scoreField: 'score', dateField: 'played_at' },
     { table: 'wordpower_logs', game: 'Word Power', earningsField: 'earnings', scoreField: 'score', dateField: 'played_at' },
@@ -51,8 +51,12 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
 
         for (const gt of GAME_TABLES) {
             try {
-                const { data } = await supabase.from(gt.table).select('*').order(gt.dateField || 'created_at', { ascending: false }).limit(1000);
+                const { data, error } = await supabase.from(gt.table).select('*').order(gt.dateField || 'created_at', { ascending: false }).limit(1000);
+                if (error) {
+                    console.error(`Error fetching ${gt.game}:`, error);
+                }
                 if (data) {
+                    console.log(`Fetched ${data.length} records for ${gt.game}`);
                     for (const row of data) {
                         const pName = (row.player_id === PLAYER_IDS.Ayaan) ? 'Ayaan' : (row.player_id === PLAYER_IDS.Riyaan) ? 'Riyaan' : (row.player || 'Unknown');
                         const timestamp = new Date(row[gt.dateField] || row.created_at).getTime();
@@ -64,12 +68,12 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                             score: gt.scoreField ? (row[gt.scoreField] || 0) : 0,
                             timestamp: timestamp,
                             displayTime: new Date(timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }),
-                            details: row.details
+                            details: row.details || row
                         });
                     }
                 }
-            } catch {
-                // Ignore missing tables
+            } catch (err) {
+                console.error(`Exception fetching ${gt.game}:`, err);
             }
         }
 
@@ -93,8 +97,17 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
             if (!groups[e.game]) {
                 groups[e.game] = { gameName: e.game, sessions: [], totalEarnings: 0 };
             }
-            groups[e.game].sessions.push(e);
-            groups[e.game].totalEarnings += e.earnings;
+
+            // Deduplicate Sensex and Nifty 50 to max 1 session per day (they are already filtered by date and player)
+            if (['Sensex', 'Nifty 50'].includes(e.game)) {
+                if (groups[e.game].sessions.length === 0) {
+                    groups[e.game].sessions.push(e);
+                    groups[e.game].totalEarnings += e.earnings;
+                }
+            } else {
+                groups[e.game].sessions.push(e);
+                groups[e.game].totalEarnings += e.earnings;
+            }
         });
 
         // Convert to array and order based on the static GAME_TABLES array for consistency
@@ -135,64 +148,183 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
             case 'Addition':
             case 'Subtraction':
             case 'Multiplication':
-            case 'Multiplication 25':
             case 'Multiply':
+            case 'Multiplication 25':
             case 'Divide':
             case 'Mental Math':
             case 'Math Mastery':
-                if (Array.isArray(details)) {
-                    return (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                            {details.map((item: any, i: number) => {
-                                // some math games use "equation" others use "num1 operator num2"
-                                let questionLabel = item.equation || (item.question ? item.question : `${item.num1} ${item.operator || '?'} ${item.num2}`);
-                                return (
-                                    <div key={i} className={`p-2 rounded-lg border text-sm flex justify-between items-center ${item.isCorrect !== false && item.correct !== false ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100 dark:border-emerald-500/20' : 'bg-rose-50 dark:bg-rose-500/10 border-rose-100 dark:border-rose-500/20'}`}>
-                                        <span className="font-medium text-slate-700 dark:text-slate-300">{questionLabel} = </span>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`font-bold ${item.isCorrect !== false && item.correct !== false ? 'text-emerald-600 dark:text-emerald-400' : 'line-through text-rose-400'}`}>
-                                                {item.userAnswer}
-                                            </span>
-                                            {(item.isCorrect === false || item.correct === false) && (
-                                                <span className="font-bold text-emerald-600 dark:text-emerald-400">{item.correctAnswer || item.expectedAnswer}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    );
-                }
-                return <div className="text-xs text-slate-400 italic py-2">Unrecognized format</div>;
+                const mathResults = Array.isArray(details) ? details : [];
+                if (mathResults.length === 0) return <div className="text-xs text-slate-400 italic py-2">No detailed log available</div>;
+
+                return (
+                    <div className="overflow-x-auto w-full">
+                        <table className="w-full text-left table-auto min-w-[300px]">
+                            <thead>
+                                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+                                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Ques</th>
+                                    <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center leading-none">Ans</th>
+                                    <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center leading-none">Corr</th>
+                                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right leading-none">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                                {mathResults.map((res: any, i: number) => {
+                                    // Handle missing time property gracefully, it might not exist on all past logs
+                                    let timeStr = '-';
+                                    if (res.timeTaken !== undefined && res.timeTaken !== null) {
+                                        const t = Number(res.timeTaken);
+                                        // If t > 500, we probably saved it as ms. Otherwise assume seconds.
+                                        timeStr = t > 500 ? `${(t / 1000).toFixed(1)}s` : `${t.toFixed(1)}s`;
+                                    }
+
+                                    // Parse expression for mental math vs generic num1/num2 operations vs Multiplication operand1/operand2
+                                    let expression = res.expression || res.equation || res.question;
+                                    if (!expression) {
+                                        let operator = '+';
+                                        if (gameName === 'Subtraction') operator = '-';
+                                        if (gameName === 'Multiplication' || gameName === 'Multiply' || gameName === 'Multiplication 25' || res.type === 'multiply') operator = '×';
+                                        if (gameName === 'Divide' || res.type === 'divide') operator = '÷';
+
+                                        const op1 = res.operand1 !== undefined ? res.operand1 : res.num1;
+                                        const op2 = res.operand2 !== undefined ? res.operand2 : res.num2;
+                                        expression = `${op1} ${operator} ${op2}`;
+                                    }
+
+                                    const userAnswerStr = res.userAnswer !== undefined ? res.userAnswer : '-';
+                                    const correctAnswerStr = res.answer !== undefined ? res.answer : (res.correctAnswer !== undefined ? res.correctAnswer : (res.expectedAnswer !== undefined ? res.expectedAnswer : '-'));
+
+                                    return (
+                                        <tr key={i} className={`transition-colors ${res.isCorrect ? 'bg-emerald-50/30 dark:bg-emerald-900/10 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' : 'bg-rose-50/30 dark:bg-rose-900/10 hover:bg-rose-50 dark:hover:bg-rose-900/20'}`}>
+                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                <span className="text-sm font-black text-slate-900 dark:text-slate-100 tabular-nums">{expression}</span>
+                                            </td>
+                                            <td className="px-3 py-3 text-center">
+                                                <span className={`text-sm font-bold tabular-nums ${res.isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>{userAnswerStr}</span>
+                                            </td>
+                                            <td className="px-3 py-3 text-center">
+                                                <span className={`text-sm font-bold tabular-nums text-slate-900 dark:text-white`}>{correctAnswerStr}</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <span className="text-xs font-bold text-slate-400 tabular-nums uppercase">{timeStr}</span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                );
 
             case 'Word Power':
             case 'Barron 800':
             case 'Manhattan 500':
-                // Check if it's the newer nested details or older flat array
-                const vocabArray = details.details ? details.details : (Array.isArray(details) ? details : null);
-                if (vocabArray) {
-                    return (
-                        <div className="space-y-2">
-                            {vocabArray.map((item: any, i: number) => (
-                                <div key={i} className={`p-3 rounded-xl border text-sm ${item.isCorrect !== false ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100 dark:border-emerald-500/20' : 'bg-rose-50 dark:bg-rose-500/10 border-rose-100 dark:border-rose-500/20'}`}>
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <span className="font-bold text-slate-900 dark:text-white block uppercase tracking-wide">{item.root || item.word || item.question}</span>
-                                            {item.isCorrect === false && <span className="text-xs text-slate-500 block mt-1">Expected: <strong className="text-emerald-600 dark:text-emerald-400">{item.options?.[item.correct]}</strong></span>}
+                const vocabArray = details.details ? details.details : (Array.isArray(details) ? details : []);
+                if (vocabArray.length === 0) return <div className="text-xs text-slate-400 italic py-2">No detailed log available</div>;
+
+                return (
+                    <div className="space-y-3">
+                        {vocabArray.map((d: any, dIdx: number) => {
+                            const wordDisplay = d.root || d.word || d.question || 'Word';
+                            const meaningDisplay = d.meaning ? `(${d.meaning})` : '';
+                            const expectedAnswer = d.options && d.correct !== undefined ? d.options[d.correct] : (d.expectedAnswer || d.correctAnswer || d.answer || '');
+
+                            return (
+                                <div key={dIdx} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                                    <div className={`mt-0.5 p-1 rounded-full shrink-0 ${d.isCorrect !== false ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-500' : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-500'}`}>
+                                        {d.isCorrect !== false ? <Check size={12} strokeWidth={3} /> : <X size={12} strokeWidth={3} />}
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">{wordDisplay} {meaningDisplay && <span className="text-slate-400 opacity-70">{meaningDisplay}</span>}</p>
+                                            {(d.scoreChange !== undefined && d.scoreChange !== null) && (
+                                                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${d.scoreChange > 0 ? 'bg-emerald-100/50 text-emerald-600' : d.scoreChange < 0 ? 'bg-rose-100/50 text-rose-600' : 'bg-slate-200 text-slate-500'}`}>
+                                                    {d.scoreChange > 0 ? '+' : ''}{d.scoreChange}
+                                                </span>
+                                            )}
                                         </div>
-                                        {item.isCorrect !== false ? <Check size={16} className="text-emerald-500 shrink-0 mt-0.5" /> : <X size={16} className="text-rose-500 shrink-0 mt-0.5" />}
+                                        {d.question && <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mt-1">{d.question}</p>}
+                                        {(d.isCorrect === false && expectedAnswer) && (
+                                            <p className="text-xs font-bold text-slate-500 mt-2">Expected answer: <span className="text-emerald-600 dark:text-emerald-400">{expectedAnswer}</span></p>
+                                        )}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    );
-                }
-                return null;
+                            );
+                        })}
+                    </div>
+                );
+
+            case 'Sensex':
+                const sData = details || {};
+                const sIsWin = sData.is_settled && ((sData.prediction === 'UP' && sData.actual_return >= 0) || (sData.prediction === 'DOWN' && sData.actual_return < 0));
+                return (
+                    <div className="overflow-x-auto pb-4">
+                        <table className="w-full text-left table-auto">
+                            <thead>
+                                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Prediction</th>
+                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Sensex</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                    <td className="px-4 py-4 text-center border-r border-slate-50 dark:border-slate-800/50">
+                                        <div className="flex flex-col items-center leading-tight">
+                                            <span className={`text-sm font-black ${sData.prediction === 'UP' ? 'text-emerald-500' : 'text-rose-500'}`}>{sData.prediction || '—'}</span>
+                                            {sData.is_settled ? (
+                                                <span className={`text-xs font-black mt-1 ${sIsWin ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                    {sData.earnings > 0 ? '+' : ''}{Number(sData.earnings || 0).toFixed(1)}
+                                                </span>
+                                            ) : <span className="text-[10px] font-bold text-amber-500 uppercase mt-1">Pending</span>}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-4 text-center">
+                                        {sData.is_settled ? (
+                                            <div className="flex flex-col items-center leading-tight">
+                                                <span className="text-sm font-black dark:text-white">{sData.closing_value?.toLocaleString('en-IN') || '—'}</span>
+                                                <span className={`text-xs font-bold mt-1 ${sData.actual_return >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{sData.actual_return?.toFixed(2)}%</span>
+                                            </div>
+                                        ) : <span className="text-[10px] font-bold text-slate-400 uppercase">Market Open</span>}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                );
+
+            case 'Nifty 50':
+                const nData = details || {};
+                const nIsSettled = nData.stock_return !== null && nData.stock_return !== undefined;
+                return (
+                    <div className="overflow-x-auto pb-4">
+                        <table className="w-full text-left table-auto">
+                            <thead>
+                                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Stock</th>
+                                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Return</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                    <td className="px-4 py-4 text-center border-r border-slate-50 dark:border-slate-800/50">
+                                        <span className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">{nData.stock_symbol || '—'}</span>
+                                    </td>
+                                    <td className="px-4 py-4 text-center">
+                                        {nIsSettled ? (
+                                            <div className={`text-sm font-black tabular-nums ${nData.stock_return >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                {nData.stock_return >= 0 ? '+' : ''}{Number(nData.stock_return).toFixed(2)}%
+                                            </div>
+                                        ) : (
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Pending</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                );
 
             case 'Sudoku':
             case 'Memory':
-            case 'Sensex':
-            case 'Nifty 50':
                 return <div className="text-xs text-slate-400 italic py-2 text-center bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4">Detailed granular logs are not supported for this game yet.</div>;
 
             default:
@@ -232,44 +364,47 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                     </div>
                 </header>
 
-                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl p-6 sm:p-10 mb-8 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8 group">
-                    <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none group-hover:scale-110 transition-transform duration-700">
-                        <Activity size={180} />
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm px-6 py-4 mb-8 flex items-center justify-between relative overflow-hidden">
+                    <div className="absolute -right-4 -top-4 opacity-[0.03] pointer-events-none">
+                        <Activity size={120} />
                     </div>
 
-                    <div>
-                        <div className="flex items-center gap-2 mb-3">
-                            <Calendar size={18} className="text-slate-400" />
-                            <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Select Date</h2>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => offsetDate(-1)} className="px-3 py-3 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-600 dark:text-slate-300 transition-colors font-bold text-sm shadow-sm">
-                                -1d
+                    <div className="flex items-center gap-4 relative z-10">
+                        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner">
+                            <button
+                                onClick={() => offsetDate(-1)}
+                                className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-500"
+                            >
+                                <ChevronLeft size={16} />
                             </button>
                             <input
                                 type="date"
                                 value={selectedDate}
                                 onChange={(e) => setSelectedDate(e.target.value)}
-                                className="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white px-5 py-3 rounded-xl font-bold uppercase text-sm border border-slate-200 dark:border-slate-800 shadow-inner focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                                className="bg-transparent text-slate-900 dark:text-white px-2 py-1 font-bold uppercase text-sm focus:outline-none cursor-pointer w-[130px] text-center"
                             />
-                            <button onClick={() => offsetDate(1)} className="px-3 py-3 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-600 dark:text-slate-300 transition-colors font-bold text-sm shadow-sm" disabled={selectedDate === getISTDateKey(new Date())}>
-                                +1d
+                            <button
+                                onClick={() => offsetDate(1)}
+                                className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-500"
+                            >
+                                <ChevronRight size={16} />
                             </button>
                         </div>
                     </div>
 
-                    <div className="md:text-right border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800 pt-6 md:pt-0 md:pl-8 w-full md:w-auto relative z-10">
-                        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                            {playerFilter}'s Total Earnings
-                        </h2>
-                        <div className="text-sm font-bold text-slate-500 mb-2">{displayDateString}</div>
-                        <div className={`text-6xl font-black tabular-nums tracking-tighter drop-shadow-sm ${totalEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    <div className="relative z-10 flex items-center gap-4 text-right">
+                        <div className="hidden sm:block">
+                            <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
+                                Earnings
+                            </h2>
+                        </div>
+                        <div className={`text-2xl sm:text-3xl font-black tabular-nums tracking-tighter ${totalEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                             {totalEarnings >= 0 ? '+' : ''}₹{totalEarnings.toLocaleString('en-IN')}
                         </div>
                     </div>
                 </div>
 
-                <div className="space-y-6 relative z-10">
+                <div className="space-y-12 relative z-10">
                     {gamesGrouped.length === 0 ? (
                         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2rem] p-16 text-center shadow-sm">
                             <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 shadow-inner ${playerFilter === 'Ayaan' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500' : 'bg-rose-50 dark:bg-rose-900/30 text-rose-500'}`}>
@@ -279,67 +414,26 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                             <p className="text-slate-500 text-sm">{playerFilter} hasn't played any games on {displayDateString}.</p>
                         </div>
                     ) : (
-                        gamesGrouped.map(group => {
-                            const isExpanded = expandedGames.has(group.gameName);
-                            return (
-                                <div key={group.gameName} className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden transition-all duration-300">
-                                    <button
-                                        onClick={() => toggleGameExpand(group.gameName)}
-                                        className="w-full p-6 sm:px-8 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors"
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700">
-                                                <Activity size={24} className="text-slate-400" />
-                                            </div>
-                                            <div className="text-left">
-                                                <h3 className="text-lg font-black text-slate-900 dark:text-white">{group.gameName}</h3>
-                                                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md mt-1 inline-block uppercase tracking-wider">
-                                                    {group.sessions.length} {group.sessions.length === 1 ? 'Session' : 'Sessions'}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-6">
-                                            <div className={`text-2xl font-black tabular-nums tracking-tight ${group.totalEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                                {group.totalEarnings >= 0 ? '+' : ''}₹{group.totalEarnings}
-                                            </div>
-                                            <div className={`p-2 rounded-full transition-colors ${isExpanded ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                                                {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                                            </div>
-                                        </div>
-                                    </button>
-
-                                    {isExpanded && (
-                                        <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20 px-6 py-6 sm:px-8 space-y-8">
-                                            {group.sessions.map((session, idx) => (
-                                                <div key={session.id} className="relative">
-                                                    {idx > 0 && <div className="absolute -top-4 left-0 right-0 h-px bg-slate-200 dark:bg-slate-800"></div>}
-
-                                                    <div className="flex items-center justify-between mb-4">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"></div>
-                                                            <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Session at {session.displayTime}</span>
-                                                        </div>
-                                                        <div className="flex gap-4 items-center">
-                                                            {session.score > 0 && (
-                                                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Score: <span className="text-slate-700 dark:text-slate-300">{session.score}</span></span>
-                                                            )}
-                                                            <span className={`text-sm font-black tabular-nums ${session.earnings >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                                                {session.earnings >= 0 ? '+' : ''}₹{session.earnings}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="pl-4 border-l-2 border-slate-200 dark:border-slate-800">
-                                                        {renderGameDetails(group.gameName, session.details)}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                        gamesGrouped.map(group => (
+                            <div key={group.gameName} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden pb-4">
+                                <div className="p-4 sm:px-6 bg-slate-50/50 dark:bg-slate-800/20 flex items-center justify-between">
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight uppercase">{group.gameName}</h3>
+                                    <div className={`text-xl font-black tabular-nums tracking-tighter ${group.totalEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                        {group.totalEarnings >= 0 ? '+' : ''}₹{group.totalEarnings}
+                                    </div>
                                 </div>
-                            );
-                        })
+
+                                <div className="p-0 space-y-4">
+                                    {group.sessions.map((session, idx) => (
+                                        <div key={session.id}>
+                                            <div className="px-4 sm:px-6 bg-white dark:bg-slate-900">
+                                                {renderGameDetails(group.gameName, session.details)}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))
                     )}
                 </div>
             </div>
