@@ -30,12 +30,12 @@ export const MemoryPreEntry: React.FC<MemoryPreEntryProps> = ({ selectedUser, is
                 <div className="w-full max-w-xs bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 mb-8 text-left shadow-sm">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">📋 Rules</p>
                     <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-300 font-medium">
-                        <li>• 3×3 grid with numbers 1–9 shown for 5s</li>
-                        <li>• Click numbers in ascending order (1→9)</li>
-                        <li>• Complete? Advance to 4×4 grid (1–16)</li>
-                        <li>• Wrong click = game over for that level</li>
-                        <li>• <span className="text-emerald-500 font-bold">+1pt</span> per 3×3 correct · <span className="text-emerald-500 font-bold">+2pt</span> per 4×4 correct</li>
-                        <li>• 100 seconds total timer</li>
+                        <li>• Numbers shown for <span className="text-indigo-500 font-bold">10s</span> (both levels)</li>
+                        <li>• Click numbers in ascending order (1→9, then 1→16)</li>
+                        <li>• Wrong click = <span className="text-rose-500 font-bold">Penalty</span> + Game Over</li>
+                        <li>• <span className="text-emerald-500 font-bold">+1pt</span> / <span className="text-rose-500 font-bold">-1pt</span> for 3×3 grid</li>
+                        <li>• <span className="text-emerald-500 font-bold">+2pt</span> / <span className="text-rose-500 font-bold">-2pt</span> for 4×4 grid</li>
+                        <li>• 100 seconds total match timer</li>
                     </ul>
                 </div>
                 <button onClick={onStart} className="w-full max-w-xs h-20 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 transition-all hover:scale-105 active:scale-95 shadow-xl mx-auto block">
