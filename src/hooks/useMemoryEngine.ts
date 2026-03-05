@@ -6,6 +6,8 @@ export interface MemoryResult {
     totalScore: number;
     reachedLevel4: boolean;
     wrongClick: number | null; // the number they clicked wrongly, or null
+    grid: number[];
+    clickedNumbers: number[];
 }
 
 export const useMemoryEngine = (
@@ -57,10 +59,10 @@ export const useMemoryEngine = (
         setTimeLeft(100);
         setIsActive(true);
 
-        // Reveal for 5 seconds then hide
+        // Reveal for 10 seconds then hide
         setTimeout(() => {
             setIsRevealed(false);
-        }, 5000);
+        }, 10000);
     }, []);
 
     // Timer
@@ -79,7 +81,9 @@ export const useMemoryEngine = (
                         level4Correct: level4CorrectRef.current,
                         totalScore: level3CorrectRef.current + (level4CorrectRef.current * 2),
                         reachedLevel4: level3CorrectRef.current === 9,
-                        wrongClick: null
+                        wrongClick: null,
+                        grid: grid,
+                        clickedNumbers: clickedNumbers
                     });
                 }
             } else {
@@ -109,10 +113,10 @@ export const useMemoryEngine = (
                     setNextExpected(1);
                     setClickedNumbers([]);
 
-                    // Reveal 4x4 for 8 seconds
+                    // Reveal 4x4 for 10 seconds
                     setTimeout(() => {
                         setIsRevealed(false);
-                    }, 8000);
+                    }, 10000);
                 }
             } else {
                 level4CorrectRef.current++;
@@ -126,7 +130,9 @@ export const useMemoryEngine = (
                             level4Correct: level4CorrectRef.current,
                             totalScore: level3CorrectRef.current + (level4CorrectRef.current * 2),
                             reachedLevel4: true,
-                            wrongClick: null
+                            wrongClick: null,
+                            grid: grid,
+                            clickedNumbers: newClicked
                         });
                     }
                 }
@@ -136,15 +142,19 @@ export const useMemoryEngine = (
             setWrongClick(value);
             setGameOver(true);
 
+            const penalty = level === 4 ? 2 : 1;
+
             if (!hasFinishedRef.current) {
                 hasFinishedRef.current = true;
                 setIsActive(false);
                 onFinishRef.current({
                     level3Correct: level3CorrectRef.current,
                     level4Correct: level4CorrectRef.current,
-                    totalScore: level3CorrectRef.current + (level4CorrectRef.current * 2),
+                    totalScore: level3CorrectRef.current + (level4CorrectRef.current * 2) - penalty,
                     reachedLevel4: level === 4,
-                    wrongClick: value
+                    wrongClick: value,
+                    grid: grid,
+                    clickedNumbers: clickedNumbers
                 });
             }
         }

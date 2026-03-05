@@ -16,8 +16,8 @@ import { MemoryHistory } from '../src/components/memory/MemoryHistory';
 
 interface MemoryViewProps { onBack: () => void; }
 enum SubView { HUB = 'hub', PIN_ENTRY = 'pin_entry', PRE_ENTRY = 'pre_entry', GAME = 'game', RESULTS = 'results', LOCAL_DASHBOARD = 'local_dashboard', MASTER_HISTORY = 'master_history' }
-interface GameSession { id: string; player: string; score: number; levelReached: number; earnings: number; timestamp: number; }
-interface DailyRecord { dateKey: string; displayDate: string; timestamp: number; ayaanEarnings: number | null; riyaanEarnings: number | null; }
+interface GameSession { id: string; player: string; score: number; levelReached: number; earnings: number; timestamp: number; grid?: number[]; clickedNumbers?: number[]; wrongClick?: number | null; }
+interface DailyRecord { dateKey: string; displayDate: string; timestamp: number; ayaanEarnings: number | null; ayaanTime: string | null; riyaanEarnings: number | null; riyaanTime: string | null; }
 
 export const MemoryView: React.FC<MemoryViewProps> = ({ onBack }) => {
     const settings = useGameStore(s => s.settings);
@@ -45,7 +45,8 @@ export const MemoryView: React.FC<MemoryViewProps> = ({ onBack }) => {
         const h: GameSession[] = data.map((log: any) => {
             const pName = log.player_id === PLAYER_IDS.Ayaan ? 'Ayaan' : 'Riyaan';
             if (pName === 'Ayaan') aT += log.earnings; else rT += log.earnings;
-            return { id: log.id, player: pName, score: log.score, levelReached: log.level_reached, earnings: log.earnings, timestamp: new Date(log.played_at).getTime() };
+            const details = log.details || {};
+            return { id: log.id, player: pName, score: log.score, levelReached: log.level_reached, earnings: log.earnings, timestamp: new Date(log.played_at).getTime(), grid: details.grid, clickedNumbers: details.clickedNumbers, wrongClick: details.wrongClick };
         });
         setAyaanTotal(aT); setRiyaanTotal(rT); setHistory(h);
     }, []);
@@ -92,7 +93,8 @@ export const MemoryView: React.FC<MemoryViewProps> = ({ onBack }) => {
                 details: result, played_at: playedAt.toISOString()
             });
             setHistory(prev => [{
-                id: crypto.randomUUID(), player: selectedUser, score: result.totalScore, levelReached: result.reachedLevel4 ? 4 : 3, earnings, timestamp: playedAt.getTime()
+                id: crypto.randomUUID(), player: selectedUser, score: result.totalScore, levelReached: result.reachedLevel4 ? 4 : 3, earnings, timestamp: playedAt.getTime(),
+                grid: result.grid, clickedNumbers: result.clickedNumbers, wrongClick: result.wrongClick
             }, ...prev]);
         }
         setSubView(SubView.RESULTS);
@@ -123,9 +125,15 @@ export const MemoryView: React.FC<MemoryViewProps> = ({ onBack }) => {
         const groups: Record<string, DailyRecord> = {};
         history.forEach(s => {
             const dk = getISTDateKey(s.timestamp);
-            if (!groups[dk]) groups[dk] = { dateKey: dk, displayDate: new Date(s.timestamp).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric' }), timestamp: s.timestamp, ayaanEarnings: null, riyaanEarnings: null };
-            if (s.player === 'Ayaan') groups[dk].ayaanEarnings = (groups[dk].ayaanEarnings || 0) + s.earnings;
-            else groups[dk].riyaanEarnings = (groups[dk].riyaanEarnings || 0) + s.earnings;
+            if (!groups[dk]) groups[dk] = { dateKey: dk, displayDate: new Date(s.timestamp).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric' }), timestamp: s.timestamp, ayaanEarnings: null, ayaanTime: null, riyaanEarnings: null, riyaanTime: null };
+
+            if (s.player === 'Ayaan') {
+                groups[dk].ayaanEarnings = (groups[dk].ayaanEarnings || 0) + s.earnings;
+                groups[dk].ayaanTime = new Date(s.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+            } else {
+                groups[dk].riyaanEarnings = (groups[dk].riyaanEarnings || 0) + s.earnings;
+                groups[dk].riyaanTime = new Date(s.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+            }
         });
         return Object.values(groups).sort((a, b) => b.timestamp - a.timestamp);
     }, [history]);
