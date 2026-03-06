@@ -24,6 +24,7 @@ import { ViewType, AppSetting, Profile } from './src/types';
 import { supabase } from './src/lib/supabase';
 import { fetchAndCacheHolidays } from './src/lib/holidayManager';
 import { useGameStore } from './src/store/useGameStore';
+import { StorageWarning } from './src/components/StorageWarning';
 
 const App: React.FC = () => {
   const navigate = useNavigate(); // Hook for navigation
@@ -42,6 +43,7 @@ const App: React.FC = () => {
     const map = data.reduce((acc: any, curr) => ({ ...acc, [curr.key]: curr.value }), {});
     return {
       dateOverride: map['addition_date_override'] as string || null,
+      seasonEndDate: map['season_end_date'] as string || '2027-01-01T00:00:00',
       additionEnabled: map['game_enabled_addition'] !== false,
       subtractionEnabled: map['game_enabled_subtraction'] !== false,
       multiplicationEnabled: map['game_enabled_multiplication'] !== false,
@@ -104,6 +106,7 @@ const App: React.FC = () => {
           if (updatedRow?.key) {
             const keyMap: Record<string, string> = {
               'addition_date_override': 'dateOverride',
+              'season_end_date': 'seasonEndDate',
               'game_enabled_addition': 'additionEnabled',
               'game_enabled_subtraction': 'subtractionEnabled',
               'game_enabled_multiplication': 'multiplicationEnabled',
@@ -210,6 +213,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+      <StorageWarning />
       <main className="max-w-5xl mx-auto min-h-screen">
         <Routes>
           <Route path="/" element={

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { isMarketHoliday } from '../src/lib/holidayManager';
-import { supabase } from '../src/lib/supabase';
+import { supabase, handleSupabaseError } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { useGameStore } from '../src/store/useGameStore';
 import { getISTDateKey } from '../src/lib/dateUtils';
@@ -106,7 +106,7 @@ export const MultiplyView: React.FC<MultiplyViewProps> = ({ onBack }) => {
                 player_id: pid, score: fScore, wrong_count: fWrong, earnings, details: fResults,
                 played_at: new Date(getEffectiveDate().getTime()).toISOString()
             });
-            if (insertError) {
+            if (insertError) { handleSupabaseError(insertError);
                 console.error('❌ Multiply log insert failed:', insertError);
             } else {
                 console.log('✅ Multiply log saved successfully');

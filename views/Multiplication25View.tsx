@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { isMarketHoliday } from '../src/lib/holidayManager';
-import { supabase } from '../src/lib/supabase';
+import { supabase, handleSupabaseError } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { useGameStore } from '../src/store/useGameStore';
 import { getISTDateKey } from '../src/lib/dateUtils';
@@ -120,7 +120,7 @@ export const Multiplication25View: React.FC<Multiplication25ViewProps> = ({ onBa
             const userProfile = getUserProfile(selectedUser);
             const playerId = userProfile ? userProfile.id : (selectedUser === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan);
             const { error: insertError } = await supabase.from('multiplication25_logs').insert({ player_id: playerId, score: fScore, wrong_count: fWrong, earnings, details: fResults, played_at: new Date(effectiveTime).toISOString() });
-            if (insertError) {
+            if (insertError) { handleSupabaseError(insertError);
                 console.error('❌ Multiplication25 log insert failed:', insertError);
             } else {
                 console.log('✅ Multiplication25 log saved successfully');

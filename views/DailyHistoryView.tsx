@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Calendar, User, Users, Activity, Clock, ChevronDown, ChevronUp, Check, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { supabase } from '../src/lib/supabase';
+import { supabase, handleSupabaseError } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { getISTDateKey } from '../src/lib/dateUtils';
 

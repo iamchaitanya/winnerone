@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Settings, Calendar, RotateCcw, ToggleLeft, ToggleRight, Gamepad2, Clock, Lock, UserCheck, Trash2, AlertTriangle, Fingerprint } from 'lucide-react';
-import { supabase } from '../src/lib/supabase';
+import { supabase, handleSupabaseError } from '../src/lib/supabase';
 import { useGameStore } from '../src/store/useGameStore'; // Added store import
 
 interface AdminViewProps {
@@ -12,12 +12,20 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
   // Grab global state directly from Zustand
   const settings = useGameStore((state) => state.settings);
   const profiles = useGameStore((state) => state.profiles);
+  const isStorageFull = useGameStore((state) => state.isStorageFull);
   const setSettings = useGameStore((state) => state.setSettings);
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [adminError, setAdminError] = useState('');
   const [isResetting, setIsResetting] = useState(false);
+
+  // Determine if the current season has ended
+  const isSeasonEnded = (() => {
+    const now = new Date();
+    const endDate = new Date(settings.seasonEndDate || '2027-01-01T00:00:00');
+    return now.getTime() >= endDate.getTime();
+  })();
 
   // Local state for smooth typing, synced with global profiles
   const [localProfiles, setLocalProfiles] = useState<any[]>([]);
@@ -128,17 +136,55 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
   };
 
   const handleMasterReset = async () => {
-    const confirmed = window.confirm("⚠️ DANGER ZONE ⚠️\n\nThis will permanently DELETE ALL DATA from the Cloud Database.");
+    const confirmed = window.confirm("⚠️ DANGER ZONE ⚠️\n\nThis will permanently DELETE ALL DATA from the Cloud Database. A backup will be downloaded first.");
     if (confirmed) {
       setIsResetting(true);
       try {
-        // Fixed UUID deletion logic to prevent type crashing
         const safeUUID = '00000000-0000-0000-0000-000000000000';
-        await supabase.from('addition_logs').delete().neq('id', safeUUID);
-        await supabase.from('nifty_logs').delete().neq('id', safeUUID);
-        await supabase.from('game_attempts').delete().not('id', 'is', null); // Safest fallback for any type
+        const tables = [
+          'addition_logs', 'subtraction_logs', 'multiplication_logs',
+          'multiplication25_logs', 'multiply_logs', 'divide_logs',
+          'mentalmath_logs', 'mathmastery_logs', 'nifty_logs',
+          'sensex_logs', 'sudoku_logs', 'memory_logs',
+          'wordpower_logs', 'barron800_logs', 'manhattan500_logs',
+          'game_attempts'
+        ];
 
-        alert("✅ Cloud Wiped. App will restart.");
+        // 1. Fetch all data for backup
+        const backupData: Record<string, any[]> = {};
+        for (const table of tables) {
+          const { data, error } = await supabase.from(table).select('*');
+          if (!error && data) {
+            backupData[table] = data;
+          }
+        }
+
+        // 2. Download the backup as a JSON file
+        const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const currentYear = new Date().getFullYear();
+        a.download = `winnerone_backup_${currentYear}_season.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // 3. Delete all data from all tables
+        for (const table of tables) {
+          if (table === 'game_attempts') {
+            await supabase.from(table).delete().not('id', 'is', null);
+          } else {
+            await supabase.from(table).delete().neq('id', safeUUID);
+          }
+        }
+
+        // 4. Update the season end date to Dec 31st of the new current year
+        const nextSeasonEnd = new Date(currentYear, 11, 31, 23, 59, 59).toISOString();
+        await handleUpdateSetting('season_end_date', nextSeasonEnd);
+
+        alert("✅ Cloud Wiped & New Season Started. App will restart.");
         window.location.reload();
       } catch (error) {
         alert("❌ Reset Failed. Check Console.");
@@ -416,11 +462,12 @@ export const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
           </div>
           <button
             onClick={handleMasterReset}
-            disabled={isResetting}
-            className="w-full h-14 bg-rose-600 dark:bg-rose-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20"
+            disabled={isResetting || (!isSeasonEnded && !isStorageFull)}
+            className={`w-full h-14 text-white rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20 transition-colors ${(isResetting || (!isSeasonEnded && !isStorageFull)) ? 'bg-rose-400 dark:bg-rose-900/50 cursor-not-allowed opacity-50' : 'bg-rose-600 dark:bg-rose-700 hover:bg-rose-700 dark:hover:bg-rose-600'
+              }`}
           >
             {isResetting ? <Clock className="animate-spin" size={18} /> : <Trash2 size={18} />}
-            {isResetting ? 'WIPING CLOUD...' : 'MASTER RESET'}
+            {isResetting ? 'WIPING CLOUD...' : (!isSeasonEnded && !isStorageFull) ? 'SEASON ACTIVE (DISABLED)' : 'MASTER RESET & DOWNLOAD'}
           </button>
         </div>
       </div>

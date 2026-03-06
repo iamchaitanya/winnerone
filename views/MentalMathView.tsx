@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { isMarketHoliday } from '../src/lib/holidayManager';
-import { supabase } from '../src/lib/supabase';
+import { supabase, handleSupabaseError } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { useGameStore } from '../src/store/useGameStore';
 import { getISTDateKey } from '../src/lib/dateUtils';
@@ -192,7 +192,7 @@ export const MentalMathView: React.FC<MentalMathViewProps> = ({ onBack }) => {
                 played_at: playedAtDate.toISOString()
             });
 
-            if (insertError) {
+            if (insertError) { handleSupabaseError(insertError);
                 console.error('❌ MentalMath log insert failed:', insertError);
             } else {
                 console.log('✅ MentalMath log saved successfully');

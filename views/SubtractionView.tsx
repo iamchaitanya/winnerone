@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { isMarketHoliday } from '../src/lib/holidayManager';
-import { supabase } from '../src/lib/supabase';
+import { supabase, handleSupabaseError } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { useGameStore } from '../src/store/useGameStore';
 import { getISTDateKey } from '../src/lib/dateUtils';
@@ -204,7 +204,7 @@ export const SubtractionView: React.FC<SubtractionViewProps> = ({ onBack }) => {
                 details: fResults,
                 played_at: new Date(effectiveTime).toISOString()
             });
-            if (insertError) {
+            if (insertError) { handleSupabaseError(insertError);
                 console.error('❌ Subtraction log insert failed:', insertError);
             } else {
                 console.log('✅ Subtraction log saved successfully');

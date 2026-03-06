@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, User, Users, Trophy, Crown, RefreshCw } from 'lucide-react';
-import { supabase } from '../src/lib/supabase';
+import { supabase, handleSupabaseError } from '../src/lib/supabase';
 
 interface PlayerScoreSummary {
   player_id: string;

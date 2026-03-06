@@ -3,7 +3,7 @@ import { ViewType } from '../src/types';
 import { PlusCircle, MinusCircle, XCircle, Divide, TrendingUp, Grid, Moon, Sun, Lock, ShieldAlert, Clock, Trophy, Heart, Brain, BrainCircuit, Check, Puzzle, Layers, BookOpen, GraduationCap, Library, CalendarDays } from 'lucide-react';
 import { useGameStore } from '../src/store/useGameStore';
 import { isMarketHoliday, getHolidayDetail } from '../src/lib/holidayManager';
-import { supabase } from '../src/lib/supabase';
+import { supabase, handleSupabaseError } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { getISTDateKey } from '../src/lib/dateUtils';
 
@@ -20,13 +20,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
   type CompletionMap = Record<string, { ayaan: boolean; riyaan: boolean }>;
   const [completions, setCompletions] = useState<CompletionMap>({});
 
-  const getISTDateKeyToday = useCallback(() => {
-    const now = settings.dateOverride ? new Date(settings.dateOverride) : new Date();
-    return getISTDateKey(now);
-  }, [settings.dateOverride]);
-
   const fetchCompletions = useCallback(async () => {
-    const todayIST = getISTDateKeyToday();
+    // Bring logic inline to prevent reference recreations
+    const now = settings.dateOverride ? new Date(settings.dateOverride) : new Date();
+    const todayIST = getISTDateKey(now);
     const startOfDay = `${todayIST}T00:00:00+05:30`;
     const endOfDay = `${todayIST}T23:59:59+05:30`;
 
@@ -64,8 +61,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
       };
     }));
 
-    setCompletions(results);
-  }, [getISTDateKeyToday]);
+    setCompletions(prev => {
+      // Prevent state updates if objects are deeply equal to stop the loop
+      if (JSON.stringify(prev) === JSON.stringify(results)) return prev;
+      return results;
+    });
+  }, [settings.dateOverride]);
 
   useEffect(() => {
     fetchCompletions();
@@ -100,7 +101,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
   const [timeLeft, setTimeLeft] = useState<{ days: number, hours: number, minutes: number } | null>(null);
   const [isGameEnded, setIsGameEnded] = useState(false);
 
-  const endDate = new Date('2027-01-01T00:00:00');
+  const endDateString = settings.seasonEndDate || '2027-01-01T00:00:00';
 
   const getEffectiveDate = useCallback(() => {
     const now = new Date();
@@ -131,6 +132,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
   useEffect(() => {
     const updateTimer = () => {
       const current = getEffectiveDate();
+      const endDate = new Date(endDateString);
       const diff = endDate.getTime() - current.getTime();
 
       if (diff <= 0) {
@@ -148,7 +150,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [getEffectiveDate]);
+  }, [getEffectiveDate, endDateString]);
 
   return (
     <div className="animate-in fade-in duration-700">
@@ -218,7 +220,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
               </div>
               <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter mb-4">The Journey Concludes</h2>
               <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-6">
-                Thank you for being part of WinnerOne. The 2026 season has officially come to an end. It's been an incredible year of competition, strategy, and mental agility.
+                Thank you for being part of WinnerOne. The {new Date(endDateString).getFullYear() - 1} season has officially come to an end. It's been an incredible year of competition, strategy, and mental agility.
               </p>
               <div className="flex items-center justify-center gap-2 text-rose-500 font-black text-xs uppercase tracking-widest">
                 <Heart size={14} fill="currentColor" />

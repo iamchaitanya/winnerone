@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { supabase } from '../src/lib/supabase';
+import { supabase, handleSupabaseError } from '../src/lib/supabase';
 import { useGameStore } from '../src/store/useGameStore';
 import { isMarketHoliday } from '../src/lib/holidayManager';
 import { PLAYER_IDS } from '../src/lib/constants';
@@ -164,7 +164,7 @@ export const MathMasteryView: React.FC<MathMasteryViewProps> = ({ onBack }) => {
                 details: fResults,
                 played_at: new Date(effectiveTime).toISOString()
             });
-            if (insertError) {
+            if (insertError) { handleSupabaseError(insertError);
                 console.error('❌ Math Mastery log insert failed:', insertError);
             } else {
                 console.log('✅ Math Mastery log saved successfully');

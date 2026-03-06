@@ -5,6 +5,7 @@ import { Profile } from '../types.ts';
 interface GameState {
   settings: {
     dateOverride: string | null;
+    seasonEndDate: string | null;
     additionEnabled: boolean;
     subtractionEnabled: boolean;
     multiplicationEnabled: boolean;
@@ -38,15 +39,18 @@ interface GameState {
     manhattan500Multiplier: number;
   };
   profiles: Profile[];
+  isStorageFull: boolean;
   // Actions to update the state
   setSettings: (newSettings: Partial<GameState['settings']>) => void;
   setProfiles: (profiles: Profile[]) => void;
+  setStorageFull: (isFull: boolean) => void;
 }
 
 export const useGameStore = create<GameState>((set) => ({
   // Initial state values
   settings: {
     dateOverride: null,
+    seasonEndDate: '2027-01-01T00:00:00',
     additionEnabled: true,
     subtractionEnabled: true,
     multiplicationEnabled: true,
@@ -80,6 +84,7 @@ export const useGameStore = create<GameState>((set) => ({
     manhattan500Multiplier: 1,
   },
   profiles: [],
+  isStorageFull: false,
 
   // Logic to merge new settings into existing ones
   setSettings: (newSettings) =>
@@ -89,4 +94,7 @@ export const useGameStore = create<GameState>((set) => ({
 
   // Logic to replace the profiles list
   setProfiles: (profiles) => set({ profiles }),
+
+  // Logic to toggle storage full barrier state
+  setStorageFull: (isFull) => set({ isStorageFull: isFull }),
 }));

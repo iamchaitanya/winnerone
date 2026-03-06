@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { isMarketHoliday, getHolidayDetail } from '../src/lib/holidayManager';
 import { fetchAllLiveReturns } from '../src/lib/stockFetcher';
-import { supabase } from '../src/lib/supabase';
+import { supabase, handleSupabaseError } from '../src/lib/supabase';
 import { PLAYER_IDS } from '../src/lib/constants';
 import { useGameStore } from '../src/store/useGameStore';
 import { getISTDateKey } from '../src/lib/dateUtils';
