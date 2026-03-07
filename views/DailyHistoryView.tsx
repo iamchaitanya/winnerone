@@ -39,20 +39,22 @@ type PlayerFilter = 'Ayaan' | 'Riyaan';
 
 export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) => {
     const [allEntries, setAllEntries] = useState<GameEntry[]>([]);
+    const [dataCache, setDataCache] = useState<Record<string, GameEntry[]>>({});
     const [loading, setLoading] = useState(true);
 
     const [selectedDate, setSelectedDate] = useState<string>(getISTDateKey(new Date()));
+    const [tempDate, setTempDate] = useState<string>(selectedDate);
     const [playerFilter, setPlayerFilter] = useState<PlayerFilter>('Ayaan');
     const [expandedGames, setExpandedGames] = useState<Set<string>>(new Set());
     const [showSudokuSolutions, setShowSudokuSolutions] = useState<Record<string, boolean>>({});
 
-    const fetchAllData = useCallback(async () => {
+    const fetchAllData = useCallback(async (date: string) => {
         setLoading(true);
         const entries: GameEntry[] = [];
 
         // Calculate the boundaries of the selected date in IST
-        const startOfDay = `${selectedDate}T00:00:00+05:30`;
-        const endOfDay = `${selectedDate}T23:59:59+05:30`;
+        const startOfDay = `${date}T00:00:00+05:30`;
+        const endOfDay = `${date}T23:59:59+05:30`;
 
         for (const gt of GAME_TABLES) {
             try {
@@ -90,12 +92,24 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
 
         // Sort globally across all games by time
         entries.sort((a, b) => b.timestamp - a.timestamp);
+
+        // Update cache and state
+        setDataCache(prev => ({ ...prev, [date]: entries }));
         setAllEntries(entries);
         setLoading(false);
-    }, [selectedDate]); // Only refetch when the date changes
+    }, []); // Only refetch when the date changes
 
-    // Refetch whenever the date changes
-    useEffect(() => { fetchAllData(); }, [fetchAllData]);
+    // Refetch whenever the date changes, checking cache first
+    useEffect(() => {
+        if (!selectedDate || selectedDate.length < 10) return; // Guard against partial/invalid dates
+
+        if (dataCache[selectedDate]) {
+            setAllEntries(dataCache[selectedDate]);
+            setLoading(false);
+        } else {
+            fetchAllData(selectedDate);
+        }
+    }, [selectedDate, dataCache, fetchAllData]);
 
     const filteredGames = useMemo(() => {
         return allEntries.filter(e => e.player === playerFilter);
@@ -149,8 +163,11 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
 
     const offsetDate = (days: number) => {
         const d = new Date(selectedDate);
-        d.setDate(d.getDate() + days);
-        setSelectedDate(getISTDateKey(d));
+        const next = new Date(d);
+        next.setDate(d.getDate() + days);
+        const nextKey = getISTDateKey(next);
+        setSelectedDate(nextKey);
+        setTempDate(nextKey);
     };
 
     const renderGameDetails = (gameName: string, row: any) => {
@@ -595,8 +612,15 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                             </button>
                             <input
                                 type="date"
-                                value={selectedDate}
-                                onChange={(e) => setSelectedDate(e.target.value)}
+                                value={tempDate}
+                                onChange={(e) => setTempDate(e.target.value)}
+                                onBlur={() => setSelectedDate(tempDate)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        setSelectedDate(tempDate);
+                                        (e.target as HTMLInputElement).blur();
+                                    }
+                                }}
                                 className="bg-transparent text-slate-900 dark:text-white px-2 py-1 font-bold uppercase text-sm focus:outline-none cursor-pointer w-[130px] text-center"
                             />
                             <button
