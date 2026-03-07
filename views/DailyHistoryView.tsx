@@ -50,21 +50,33 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
         setLoading(true);
         const entries: GameEntry[] = [];
 
+        // Calculate the boundaries of the selected date in IST
+        const startOfDay = `${selectedDate}T00:00:00+05:30`;
+        const endOfDay = `${selectedDate}T23:59:59+05:30`;
+
+        // The specific player ID we care about right now
+        const targetPlayerId = playerFilter === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan;
+
         for (const gt of GAME_TABLES) {
             try {
-                const { data, error } = await supabase.from(gt.table).select('*').order(gt.dateField || 'created_at', { ascending: false }).limit(1000);
+                const { data, error } = await supabase
+                    .from(gt.table)
+                    .select('*')
+                    .eq('player_id', targetPlayerId)
+                    .gte(gt.dateField, startOfDay)
+                    .lte(gt.dateField, endOfDay)
+                    .order(gt.dateField, { ascending: false });
+
                 if (error) {
                     console.error(`Error fetching ${gt.game}:`, error);
                 }
                 if (data) {
-                    console.log(`Fetched ${data.length} records for ${gt.game}`);
                     for (const row of data) {
-                        const pName = (row.player_id === PLAYER_IDS.Ayaan) ? 'Ayaan' : (row.player_id === PLAYER_IDS.Riyaan) ? 'Riyaan' : (row.player || 'Unknown');
-                        const timestamp = new Date(row[gt.dateField] || row.created_at).getTime();
+                        const timestamp = new Date(row[gt.dateField]).getTime();
                         entries.push({
                             id: row.id || crypto.randomUUID(),
                             game: gt.game,
-                            player: pName,
+                            player: playerFilter,
                             earnings: row[gt.earningsField] || 0,
                             score: gt.scoreField ? (row[gt.scoreField] || 0) : 0,
                             timestamp: timestamp,
@@ -78,17 +90,16 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
             }
         }
 
+        // Sort globally across all games by time purely for grouped ordering consistency
+        entries.sort((a, b) => b.timestamp - a.timestamp);
         setAllEntries(entries);
         setLoading(false);
-    }, []);
+    }, [selectedDate, playerFilter]);
 
+    // Refetch whenever the date or player changes
     useEffect(() => { fetchAllData(); }, [fetchAllData]);
 
-    const filteredGames = useMemo(() => {
-        return allEntries.filter(e => {
-            return e.player === playerFilter && getISTDateKey(e.timestamp) === selectedDate;
-        }).sort((a, b) => b.timestamp - a.timestamp);
-    }, [allEntries, selectedDate, playerFilter]);
+    const filteredGames = allEntries;
 
     // Group the games by Game Name
     const gamesGrouped = useMemo(() => {
@@ -534,10 +545,13 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
         }
     };
 
-    if (loading) {
+    if (loading && allEntries.length === 0) {
         return (
             <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
-                <div className="animate-pulse font-black text-slate-400 uppercase tracking-widest">Loading Analytics...</div>
+                <div className="animate-pulse font-black text-slate-400 uppercase tracking-widest flex items-center gap-3">
+                    <Activity size={20} className="text-indigo-500 animate-bounce" />
+                    Fetching Data...
+                </div>
             </div>
         );
     }
@@ -607,7 +621,14 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                 </div>
 
                 <div className="space-y-12 relative z-10">
-                    {gamesGrouped.length === 0 ? (
+                    {loading && allEntries.length > 0 ? (
+                        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2rem] p-16 text-center shadow-sm">
+                            <div className="w-16 h-16 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-6 animate-pulse">
+                                <Clock size={32} className="text-slate-400" />
+                            </div>
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 animate-pulse">Loading {displayDateString}...</h3>
+                        </div>
+                    ) : gamesGrouped.length === 0 ? (
                         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2rem] p-16 text-center shadow-sm">
                             <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 shadow-inner ${playerFilter === 'Ayaan' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500' : 'bg-rose-50 dark:bg-rose-900/30 text-rose-500'}`}>
                                 {playerFilter === 'Ayaan' ? <User size={40} /> : <Users size={40} />}
