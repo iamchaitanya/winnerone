@@ -38,3 +38,7 @@ build
 *.njsproj
 *.sln
 *.sw?
+
+# Android Signing
+*.jks
+keystore.properties

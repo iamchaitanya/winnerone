@@ -154,7 +154,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, isDarkMode, onTo
 
   return (
     <div className="animate-in fade-in duration-700">
-      <header className="relative bg-gradient-to-b from-indigo-100/50 via-white to-slate-50 dark:from-indigo-950/40 dark:via-slate-950 dark:to-slate-950 pt-24 pb-24 px-8 rounded-b-[4rem] shadow-[0_20px_50px_rgba(79,70,229,0.08)] dark:shadow-none border-b border-white dark:border-slate-800/50 overflow-hidden transition-all duration-500">
+      <header className="relative bg-gradient-to-b from-indigo-100/50 via-white to-slate-50 dark:from-indigo-950/40 dark:via-slate-950 dark:to-slate-950 pt-24 pb-24 px-8 rounded-b-[4rem] shadow-[0_20px_50px_rgba(79,70,229,0.08)] dark:shadow-none border-b border-white dark:border-slate-800/50 overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] dark:opacity-[0.05] mix-blend-overlay pointer-events-none"></div>
 
         <button

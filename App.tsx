@@ -38,6 +38,7 @@ const App: React.FC = () => {
 
   const { setSettings, setProfiles } = useGameStore();
   const [isSyncing, setIsSyncing] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
 
   const mapSettings = useCallback((data: AppSetting[]) => {
     const map = data.reduce((acc: any, curr) => ({ ...acc, [curr.key]: curr.value }), {});
@@ -168,6 +169,16 @@ const App: React.FC = () => {
     };
   }, [mapSettings, setSettings, setProfiles]);
 
+  // Hide splash screen after a short delay or when syncing is complete
+  useEffect(() => {
+    if (!isSyncing) {
+      const splashTimer = setTimeout(() => {
+        setShowSplash(false);
+      }, 1500); // 1.5 seconds splash screen
+      return () => clearTimeout(splashTimer);
+    }
+  }, [isSyncing]);
+
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
     localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
@@ -201,18 +212,23 @@ const App: React.FC = () => {
     navigate(pathMap[view]);
   };
 
-  if (isSyncing) {
+  if (isSyncing || showSplash) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
-        <div className="animate-pulse font-black text-slate-400 uppercase tracking-widest">
-          Syncing with Cloud...
+      <div className="min-h-screen bg-[#031739] flex flex-col items-center justify-center animate-out fade-out duration-1000">
+        <div className="animate-in zoom-in-95 duration-700 flex flex-col items-center">
+          <img src="/logo.png" alt="WinnerOne Logo" className="w-64 h-64 object-contain mb-8 drop-shadow-2xl" />
+          <div className="flex gap-1.5 mt-8">
+            <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-indigo-300 animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <StorageWarning />
       <main className="max-w-5xl mx-auto min-h-screen">
         <Routes>

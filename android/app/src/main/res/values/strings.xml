@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">WinnerOne</string>
+    <string name="title_activity_main">WinnerOne</string>
+    <string name="package_name">com.winnerone.app</string>
+    <string name="custom_url_scheme">com.winnerone.app</string>
+</resources>
