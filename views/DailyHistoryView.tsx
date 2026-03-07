@@ -43,7 +43,6 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
     const [loading, setLoading] = useState(true);
 
     const [selectedDate, setSelectedDate] = useState<string>(getISTDateKey(new Date()));
-    const [tempDate, setTempDate] = useState<string>(selectedDate);
     const [playerFilter, setPlayerFilter] = useState<PlayerFilter>('Ayaan');
     const [expandedGames, setExpandedGames] = useState<Set<string>>(new Set());
     const [showSudokuSolutions, setShowSudokuSolutions] = useState<Record<string, boolean>>({});
@@ -99,16 +98,21 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
         setLoading(false);
     }, []); // Only refetch when the date changes
 
-    // Refetch whenever the date changes, checking cache first
+    // Refetch whenever the date changes, checking cache first (with debounce for network)
     useEffect(() => {
-        if (!selectedDate || selectedDate.length < 10) return; // Guard against partial/invalid dates
+        if (!selectedDate || selectedDate.length < 10) return;
 
         if (dataCache[selectedDate]) {
             setAllEntries(dataCache[selectedDate]);
             setLoading(false);
-        } else {
-            fetchAllData(selectedDate);
+            return;
         }
+
+        const timer = setTimeout(() => {
+            fetchAllData(selectedDate);
+        }, 500);
+
+        return () => clearTimeout(timer);
     }, [selectedDate, dataCache, fetchAllData]);
 
     const filteredGames = useMemo(() => {
@@ -165,9 +169,7 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
         const d = new Date(selectedDate);
         const next = new Date(d);
         next.setDate(d.getDate() + days);
-        const nextKey = getISTDateKey(next);
-        setSelectedDate(nextKey);
-        setTempDate(nextKey);
+        setSelectedDate(getISTDateKey(next));
     };
 
     const renderGameDetails = (gameName: string, row: any) => {
@@ -612,15 +614,8 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                             </button>
                             <input
                                 type="date"
-                                value={tempDate}
-                                onChange={(e) => setTempDate(e.target.value)}
-                                onBlur={() => setSelectedDate(tempDate)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        setSelectedDate(tempDate);
-                                        (e.target as HTMLInputElement).blur();
-                                    }
-                                }}
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
                                 className="bg-transparent text-slate-900 dark:text-white px-2 py-1 font-bold uppercase text-sm focus:outline-none cursor-pointer w-[130px] text-center"
                             />
                             <button
