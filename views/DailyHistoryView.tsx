@@ -54,15 +54,12 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
         const startOfDay = `${selectedDate}T00:00:00+05:30`;
         const endOfDay = `${selectedDate}T23:59:59+05:30`;
 
-        // The specific player ID we care about right now
-        const targetPlayerId = playerFilter === 'Ayaan' ? PLAYER_IDS.Ayaan : PLAYER_IDS.Riyaan;
-
         for (const gt of GAME_TABLES) {
             try {
+                // Fetch all records for this date across all players
                 const { data, error } = await supabase
                     .from(gt.table)
                     .select('*')
-                    .eq('player_id', targetPlayerId)
                     .gte(gt.dateField, startOfDay)
                     .lte(gt.dateField, endOfDay)
                     .order(gt.dateField, { ascending: false });
@@ -72,11 +69,12 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
                 }
                 if (data) {
                     for (const row of data) {
+                        const pName = (row.player_id === PLAYER_IDS.Ayaan) ? 'Ayaan' : (row.player_id === PLAYER_IDS.Riyaan) ? 'Riyaan' : 'Unknown';
                         const timestamp = new Date(row[gt.dateField]).getTime();
                         entries.push({
                             id: row.id || crypto.randomUUID(),
                             game: gt.game,
-                            player: playerFilter,
+                            player: pName,
                             earnings: row[gt.earningsField] || 0,
                             score: gt.scoreField ? (row[gt.scoreField] || 0) : 0,
                             timestamp: timestamp,
@@ -90,16 +88,18 @@ export const DailyHistoryView: React.FC<DailyHistoryViewProps> = ({ onBack }) =>
             }
         }
 
-        // Sort globally across all games by time purely for grouped ordering consistency
+        // Sort globally across all games by time
         entries.sort((a, b) => b.timestamp - a.timestamp);
         setAllEntries(entries);
         setLoading(false);
-    }, [selectedDate, playerFilter]);
+    }, [selectedDate]); // Only refetch when the date changes
 
-    // Refetch whenever the date or player changes
+    // Refetch whenever the date changes
     useEffect(() => { fetchAllData(); }, [fetchAllData]);
 
-    const filteredGames = allEntries;
+    const filteredGames = useMemo(() => {
+        return allEntries.filter(e => e.player === playerFilter);
+    }, [allEntries, playerFilter]);
 
     // Group the games by Game Name
     const gamesGrouped = useMemo(() => {
